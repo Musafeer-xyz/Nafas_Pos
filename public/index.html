@@ -1,0 +1,2747 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>NAFAS — POS System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --gold-dim: rgba(201, 168, 76, 0.15);
+      --dark: #0d0b08;
+      --dark-2: #141209;
+      --dark-3: #1e1a12;
+      --dark-4: #2a2418;
+      --text: #e8e0d0;
+      --text-muted: #8a7f6e;
+      --danger: #e05252;
+      --success: #52c07a;
+      --card: rgba(30, 26, 18, 0.95);
+      --border: rgba(201, 168, 76, 0.2);
+      --radius: 12px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── Login Screen ─── */
+    #login-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background: radial-gradient(ellipse at 50% 0%, rgba(201, 168, 76, 0.08) 0%, transparent 70%), var(--dark);
+    }
+
+    .brand-logo {
+      font-family: 'Cinzel', serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.3em;
+      margin-bottom: 0.25rem;
+    }
+
+    .brand-sub {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      margin-bottom: 3rem;
+    }
+
+    .pin-display {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .pin-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--gold);
+      transition: background 0.2s;
+    }
+
+    .pin-dot.filled {
+      background: var(--gold);
+    }
+
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .num-btn {
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 500;
+      padding: 1.1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .num-btn:active {
+      background: var(--dark-4);
+      transform: scale(0.95);
+    }
+
+    .num-btn.clear {
+      color: var(--danger);
+      font-size: 0.85rem;
+    }
+
+    .num-btn.enter {
+      background: var(--gold);
+      color: var(--dark);
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .num-btn.enter:active {
+      background: var(--gold-light);
+    }
+
+    #login-error {
+      margin-top: 1rem;
+      color: var(--danger);
+      font-size: 0.85rem;
+      min-height: 1.2rem;
+      text-align: center;
+    }
+
+    /* ─── App Shell ─── */
+    #app {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Top Bar */
+    .topbar {
+      background: var(--dark-2);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .topbar-brand {
+      font-family: 'Cinzel', serif;
+      font-size: 1.2rem;
+      color: var(--gold);
+      letter-spacing: 0.15em;
+    }
+
+    .topbar-role {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.4rem;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .icon-btn:hover {
+      color: var(--gold);
+    }
+
+    /* Main Content */
+    .content {
+      flex: 1;
+      padding: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Bottom Nav */
+    .bottom-nav {
+      background: var(--dark-2);
+      border-top: 1px solid var(--border);
+      display: flex;
+      position: sticky;
+      bottom: 0;
+      z-index: 100;
+      safe-area-inset-bottom: env(safe-area-inset-bottom);
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.65rem 0.5rem;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-family: 'DM Sans', sans-serif;
+      transition: color 0.15s;
+      gap: 0.25rem;
+    }
+
+    .nav-item .icon {
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+
+    .nav-item.active {
+      color: var(--gold);
+    }
+
+    /* ─── Cards & Components ─── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-card {
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem;
+    }
+
+    .stat-label {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--gold);
+      margin-top: 0.2rem;
+    }
+
+    .stat-value.success {
+      color: var(--success);
+    }
+
+    .stat-value.danger {
+      color: var(--danger);
+    }
+
+    /* Period filter */
+    .period-tabs {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+      padding-bottom: 0.2rem;
+    }
+
+    .period-tab {
+      white-space: nowrap;
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 0.35rem 0.85rem;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.15s;
+    }
+
+    .period-tab.active {
+      background: var(--gold);
+      color: var(--dark);
+      border-color: var(--gold);
+      font-weight: 600;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 0.85rem;
+    }
+
+    .form-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .form-input,
+    .form-select {
+      width: 100%;
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      padding: 0.65rem 0.85rem;
+      transition: border-color 0.15s;
+      appearance: none;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.1);
+    }
+
+    .form-select option {
+      background: var(--dark-3);
+    }
+
+    /* Buttons */
+    .btn {
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 0.75rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary {
+      background: var(--gold);
+      color: var(--dark);
+    }
+
+    .btn-primary:active {
+      background: var(--gold-light);
+      transform: scale(0.98);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .btn-danger {
+      background: rgba(224, 82, 82, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(224, 82, 82, 0.3);
+    }
+
+    .btn-success {
+      background: rgba(82, 192, 122, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(82, 192, 122, 0.3);
+    }
+
+    .btn-block {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-sm {
+      font-size: 0.78rem;
+      padding: 0.4rem 0.75rem;
+    }
+
+    /* Sale Cart */
+    .cart-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.08);
+    }
+
+    .cart-item:last-child {
+      border-bottom: none;
+    }
+
+    .cart-item-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .cart-item-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .cart-item-price {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--gold);
+    }
+
+    .cart-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 0 0;
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+    }
+
+    .cart-total-label {
+      font-family: 'Cinzel', serif;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+    }
+
+    .cart-total-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    /* Product/Combo list */
+    .item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.7rem 0;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.08);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .item-row:last-child {
+      border-bottom: none;
+    }
+
+    .item-row:active {
+      background: var(--dark-4);
+      margin: 0 -1rem;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .item-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .item-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .item-stock {
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .stock-ok {
+      color: var(--success);
+    }
+
+    .stock-low {
+      color: var(--danger);
+    }
+
+    .grade-badge {
+      display: inline-block;
+      background: var(--gold-dim);
+      color: var(--gold);
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      margin-left: 0.3rem;
+    }
+
+    /* Combo badge */
+    .combo-badge {
+      background: rgba(82, 192, 122, 0.12);
+      color: var(--success);
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+      margin-left: 0.3rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--dark-2);
+      border: 1px solid var(--border);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem;
+      animation: slideUp 0.25s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
+      }
+
+      to {
+        transform: translateY(0);
+      }
+    }
+
+    .modal-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--dark-4);
+      border-radius: 2px;
+      margin: 0 auto 1.25rem;
+    }
+
+    .modal-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.85rem;
+      color: var(--text);
+      z-index: 300;
+      opacity: 0;
+      transition: opacity 0.25s;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+    }
+
+    #toast.success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    #toast.error {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* Sale history */
+    .sale-row {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(201, 168, 76, 0.08);
+    }
+
+    .sale-row:last-child {
+      border-bottom: none;
+    }
+
+    .sale-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sale-customer {
+      font-weight: 500;
+      font-size: 0.88rem;
+    }
+
+    .sale-amount {
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .sale-row-bot {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+      align-items: center;
+    }
+
+    .sale-date {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .sale-channel {
+      font-size: 0.6rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      background: var(--gold-dim);
+      color: var(--gold);
+    }
+
+    .sale-by {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Qty control */
+    .qty-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .qty-btn {
+      width: 32px;
+      height: 32px;
+      background: var(--dark-4);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .qty-val {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.3rem 0.4rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    /* Low stock banner */
+    .alert-banner {
+      background: rgba(224, 82, 82, 0.1);
+      border: 1px solid rgba(224, 82, 82, 0.3);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.82rem;
+      color: var(--danger);
+    }
+
+    /* Sections */
+    .section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin: 1.25rem 0 0.6rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-text {
+      font-size: 0.85rem;
+    }
+
+    /* Search */
+    .search-wrap {
+      position: relative;
+      margin-bottom: 0.75rem;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--dark-3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      padding: 0.65rem 0.85rem 0.65rem 2.2rem;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--dark-4);
+      border-radius: 2px;
+    }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0.75rem 0;
+    }
+
+    /* Utility */
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .text-muted {
+      color: var(--text-muted);
+    }
+
+    .text-gold {
+      color: var(--gold);
+    }
+
+    .text-success {
+      color: var(--success);
+    }
+
+    .text-danger {
+      color: var(--danger);
+    }
+
+    .font-bold {
+      font-weight: 700;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.5rem;
+    }
+
+    .mb-2 {
+      margin-bottom: 1rem;
+    }
+
+    .mt-1 {
+      margin-top: 0.5rem;
+    }
+
+    .gap-2 {
+      gap: 0.5rem;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    /* Loading */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-center {
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══════════════════ LOGIN SCREEN ═══════════════════ -->
+  <div id="login-screen">
+    <div class="brand-logo">NAFAS</div>
+    <div class="brand-sub">Inventory & POS System</div>
+
+    <div class="pin-display">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+
+    <div class="numpad">
+      <button class="num-btn" onclick="addPin('1')">1</button>
+      <button class="num-btn" onclick="addPin('2')">2</button>
+      <button class="num-btn" onclick="addPin('3')">3</button>
+      <button class="num-btn" onclick="addPin('4')">4</button>
+      <button class="num-btn" onclick="addPin('5')">5</button>
+      <button class="num-btn" onclick="addPin('6')">6</button>
+      <button class="num-btn" onclick="addPin('7')">7</button>
+      <button class="num-btn" onclick="addPin('8')">8</button>
+      <button class="num-btn" onclick="addPin('9')">9</button>
+      <button class="num-btn clear" onclick="clearPin()">⌫ Clear</button>
+      <button class="num-btn" onclick="addPin('0')">0</button>
+      <button class="num-btn enter" onclick="submitPin()">Enter ↵</button>
+    </div>
+    <div id="login-error"></div>
+  </div>
+
+  <!-- ═══════════════════ Main APP ═══════════════════ -->
+  <div id="app">
+    <div class="topbar">
+      <div>
+        <div class="topbar-brand">NAFAS</div>
+        <div class="topbar-role" id="topbar-role">—</div>
+      </div>
+      <button class="icon-btn" onclick="logout()" title="Logout">⏏</button>
+    </div>
+
+    <div class="content" id="Main-content">
+      <!-- Dynamic content injected here -->
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav">
+      <!-- Dynamic nav based on role -->
+    </nav>
+  </div>
+
+  <!-- ═══════════════════ MODALS ═══════════════════ -->
+
+  <!-- Add Item to Sale Modal -->
+  <div class="modal-overlay" id="add-item-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="add-item-title">Select Item</div>
+
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="item-search" placeholder="Search products & combos..."
+          oninput="filterItems()" />
+      </div>
+
+      <div id="item-list-container">
+        <div class="loading-center">
+          <div class="spinner"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-outline btn-block mt-1" onclick="closeModal('add-item-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Price Override Modal -->
+  <div class="modal-overlay" id="override-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Set Custom Price</div>
+      <p class="text-muted mb-2" style="font-size:0.8rem" id="override-product-name"></p>
+
+      <div class="form-group">
+        <label class="form-label">Original Price</label>
+        <input class="form-input" id="override-original" readonly />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Custom Price (Override)</label>
+        <input class="form-input" type="number" id="override-price" placeholder="Enter custom price" />
+      </div>
+
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('override-modal')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="applyOverride()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Modal (Admin) -->
+  <div class="modal-overlay" id="product-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="product-modal-title">Add Product</div>
+
+      <input type="hidden" id="product-edit-id" />
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="form-input" id="p-name" placeholder="e.g. Ehsas Al Arabia" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="p-category">
+            <option value="Attar">Attar</option>
+            <option value="Apparel">Apparel</option>
+            <option value="Gadget">Gadget</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grade</label>
+          <select class="form-select" id="p-grade">
+            <option value="">—</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Stock (ml/pcs)</label>
+          <input class="form-input" type="number" id="p-stock" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit</label>
+          <select class="form-select" id="p-unit">
+            <option value="ml">ml</option>
+            <option value="piece">piece</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Purchase Rate ৳</label>
+          <input class="form-input" type="number" id="p-purchase" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Selling Price ৳</label>
+          <input class="form-input" type="number" id="p-sell" placeholder="0" />
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Low Stock Alert</label>
+          <input class="form-input" type="number" id="p-lowstock" placeholder="10" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lot Name</label>
+          <input class="form-input" id="p-lot" placeholder="e.g. 1st LOT" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input class="form-input" id="p-notes" placeholder="Optional notes" />
+      </div>
+
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('product-modal')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveProduct()">Save Product</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Combo Modal -->
+  <div class="modal-overlay" id="combo-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Create Combo</div>
+
+      <div class="form-group">
+        <label class="form-label">Combo Name *</label>
+        <input class="form-input" id="c-name" placeholder="e.g. Classic Trio" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Combo Price ৳ *</label>
+        <input class="form-input" type="number" id="c-price" placeholder="0" />
+      </div>
+
+      <div class="section-title">Products in Combo</div>
+      <div id="combo-products-list">
+        <!-- dynamic product selectors -->
+      </div>
+      <button class="btn btn-outline btn-sm mt-1 mb-2" onclick="addComboProductRow()">+ Add Product</button>
+
+      <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('combo-modal')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveCombo()">Save Combo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Cost Modal -->
+  <div class="modal-overlay" id="cost-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Record Cost</div>
+
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input class="form-input" id="cost-name" placeholder="e.g. Raw material, Sticker paper" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Amount ৳ *</label>
+          <input class="form-input" type="number" id="cost-amount" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="cost-cat">
+            <option value="Raw">Raw</option>
+            <option value="Packaging">Packaging</option>
+            <option value="Equipment">Equipment</option>
+            <option value="Food">Food</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="cost-status">
+            <option value="Paid">Paid</option>
+            <option value="Due">Due</option>
+            <option value="Partial">Partial</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Due Amount ৳</label>
+          <input class="form-input" type="number" id="cost-due" placeholder="0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input class="form-input" id="cost-notes" placeholder="Optional" />
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('cost-modal')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveCost()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TANJIM DISTRIBUTION MODAL ═══ -->
+  <div class="modal-overlay" id="tanjim-modal">
+    <div class="modal" style="border-radius:20px 20px 0 0;max-height:88vh">
+      <div class="modal-handle"></div>
+      <div class="modal-title">🤝 Give Stock to Tanjim</div>
+      <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
+        Select quantity to give from each attar. Stock will be deducted from Main and tracked under Tanjim.
+      </p>
+      <div id="tanjim-list">
+        <div class="loading-center">
+          <div class="spinner"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('tanjim-modal')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveTanjimDistribution()">✓ Confirm Give</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ BULK IMPORT MODAL ═══ -->
+  <div class="modal-overlay" id="import-modal">
+    <div class="modal" style="border-radius:20px 20px 0 0; max-height:92vh">
+      <div class="modal-handle"></div>
+      <div class="modal-title">📥 Bulk Import Data</div>
+
+      <!-- Tab selector -->
+      <div style="display:flex;gap:0.4rem;margin-bottom:1rem">
+        <button class="period-tab active" id="imp-tab-products" onclick="switchImportTab('products')">Products</button>
+        <button class="period-tab" id="imp-tab-sales" onclick="switchImportTab('sales')">Past Sales</button>
+        <button class="period-tab" id="imp-tab-costs" onclick="switchImportTab('costs')">Costs</button>
+      </div>
+
+      <!-- PRODUCTS TAB -->
+      <div id="imp-products-panel">
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+          Paste one product per line in this format:<br>
+          <code
+            style="color:var(--gold);font-size:0.72rem">Name, Grade, Stock(ml), PurchaseRate, SellingPrice, LotName</code><br>
+          <span style="color:var(--text-muted);font-size:0.7rem">Example: Ehsas Al Arabia, A, 435, 1450, 220, 2nd
+            LOT</span>
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+          <div>
+            <label class="form-label">Category</label>
+            <select class="form-select" id="imp-category">
+              <option value="Attar">Attar</option>
+              <option value="Apparel">Apparel</option>
+              <option value="Gadget">Gadget</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Unit</label>
+            <select class="form-select" id="imp-unit">
+              <option value="ml">ml</option>
+              <option value="piece">piece</option>
+            </select>
+          </div>
+        </div>
+        <textarea id="imp-products-text" class="form-input" rows="8"
+          placeholder="Ehsas Al Arabia, A, 435, 1450, 220, 2nd LOT&#10;Dior Sauvage, A, 270, 900, 180, 1st LOT&#10;Cool Water, B, 180, 600, 120, 1st LOT&#10;Versace, A, 600, 2000, 300, 1st LOT"
+          style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+        <div id="imp-products-preview" style="margin-top:0.5rem"></div>
+      </div>
+
+      <!-- SALES TAB -->
+      <div id="imp-sales-panel" style="display:none">
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+          Paste past sales. Each sale = one line:<br>
+          <code
+            style="color:var(--gold);font-size:0.72rem">CustomerName, ProductName, Qty(ml), Amount, Date(DD-Mon-YYYY)</code><br>
+          <span style="color:var(--text-muted);font-size:0.7rem">Example: Apu, Versace, 3.5, 200, 10-Dec-2025</span><br>
+          <span style="color:var(--text-muted);font-size:0.7rem">⚠️ Past sales won't deduct current stock (historical
+            only)</span>
+        </p>
+        <textarea id="imp-sales-text" class="form-input" rows="8"
+          placeholder="Apu, Versace, 3.5, 200, 10-Dec-2025&#10;Apu, Al Bakhoor, 3.5, 200, 10-Dec-2025&#10;Mawa, Dunhill Desire, 3.5, 500, 11-Dec-2025&#10;Jonayed, Dior Sauvage, 6, 310, 13-Dec-2025"
+          style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+        <div id="imp-sales-preview" style="margin-top:0.5rem"></div>
+      </div>
+
+      <!-- COSTS TAB -->
+      <div id="imp-costs-panel" style="display:none">
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+          Paste one cost per line:<br>
+          <code style="color:var(--gold);font-size:0.72rem">Name, Amount, Category, Status</code><br>
+          <span style="color:var(--text-muted);font-size:0.7rem">Categories: Raw, Packaging, Equipment, Food, Marketing,
+            Other</span><br>
+          <span style="color:var(--text-muted);font-size:0.7rem">Status: Paid, Due, Partial</span>
+        </p>
+        <textarea id="imp-costs-text" class="form-input" rows="8"
+          placeholder="Printer, 6000, Equipment, Paid&#10;Raw material, 5777, Raw, Partial&#10;Sticker Paper, 50, Packaging, Paid&#10;Bottle 3.5x5dzn, 900, Packaging, Paid&#10;Lunch, 760, Food, Paid"
+          style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+        <div id="imp-costs-preview" style="margin-top:0.5rem"></div>
+      </div>
+
+      <!-- Progress bar (hidden by default) -->
+      <div id="imp-progress-wrap" style="display:none;margin-top:0.75rem">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.3rem">
+          <span id="imp-progress-label" style="color:var(--text-muted)">Importing...</span>
+          <span id="imp-progress-count" style="color:var(--gold)"></span>
+        </div>
+        <div style="background:var(--dark-4);border-radius:4px;height:6px;overflow:hidden">
+          <div id="imp-progress-bar"
+            style="height:100%;background:var(--gold);width:0%;transition:width 0.2s;border-radius:4px"></div>
+        </div>
+      </div>
+
+      <!-- Result summary -->
+      <div id="imp-result" style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:8px;font-size:0.82rem">
+      </div>
+
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('import-modal')">Close</button>
+        <button class="btn btn-primary" style="flex:1" id="imp-submit-btn" onclick="runImport()">Import Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script>
+    // ═══════════════════════════════════════════════
+    //  CONFIG & STATE
+    // ═══════════════════════════════════════════════
+    const API = '';  // same origin
+    let token = localStorage.getItem('nafas_token') || null;
+    let role = localStorage.getItem('nafas_role') || null;
+    let currentView = 'dashboard';
+    let cart = [];
+    let allProducts = [];
+    let allCombos = [];
+    let overrideTarget = null;
+
+    // ═══════════════════════════════════════════════
+    //  AUTH
+    // ═══════════════════════════════════════════════
+    let pinBuffer = '';
+
+    function addPin(digit) {
+      if (pinBuffer.length >= 4) return;
+      pinBuffer += digit;
+      updatePinDisplay();
+      if (pinBuffer.length === 4) setTimeout(submitPin, 200);
+    }
+
+    function clearPin() {
+      pinBuffer = '';
+      updatePinDisplay();
+      document.getElementById('login-error').textContent = '';
+    }
+
+    function updatePinDisplay() {
+      for (let i = 0; i < 4; i++) {
+        document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinBuffer.length);
+      }
+    }
+
+    async function submitPin() {
+      if (pinBuffer.length < 4) return;
+      try {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pinBuffer })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+
+        token = data.token; role = data.role;
+        localStorage.setItem('nafas_token', token);
+        localStorage.setItem('nafas_role', role);
+        initApp();
+      } catch (err) {
+        document.getElementById('login-error').textContent = err.message || 'Invalid PIN';
+        pinBuffer = '';
+        updatePinDisplay();
+      }
+    }
+
+    function logout() {
+      token = null; role = null;
+      localStorage.removeItem('nafas_token');
+      localStorage.removeItem('nafas_role');
+      cart = [];
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      pinBuffer = ''; updatePinDisplay();
+      document.getElementById('login-error').textContent = '';
+    }
+
+    // ═══════════════════════════════════════════════
+    //  API HELPERS
+    // ═══════════════════════════════════════════════
+    async function apiFetch(path, opts = {}) {
+      const res = await fetch(API + path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(opts.headers || {})
+        }
+      });
+      if (res.status === 401) { logout(); return null; }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Request failed');
+      return data;
+    }
+
+    // ═══════════════════════════════════════════════
+    //  APP INIT
+    // ═══════════════════════════════════════════════
+    function initApp() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      document.getElementById('app').style.flexDirection = 'column';
+      document.getElementById('topbar-role').textContent = role === 'admin' ? '👑 Admin' : '🤝 Assistant';
+
+      buildNav();
+      navigateTo('sale'); // Start on sale entry for quick access
+    }
+
+    function buildNav() {
+      const nav = document.getElementById('bottom-nav');
+      const adminItems = [
+        { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+        { id: 'sale', icon: '🛒', label: 'Sale' },
+        { id: 'products', icon: '📦', label: 'Products' },
+        { id: 'history', icon: '🧾', label: 'History' },
+        { id: 'costs', icon: '💸', label: 'Costs' },
+      ];
+      const assistantItems = [
+        { id: 'sale', icon: '🛒', label: 'New Sale' },
+        { id: 'stock', icon: '📦', label: 'Stock' },
+      ];
+      const items = role === 'admin' ? adminItems : assistantItems;
+
+      nav.innerHTML = items.map(item => `
+    <button class="nav-item" id="nav-${item.id}" onclick="navigateTo('${item.id}')">
+      <span class="icon">${item.icon}</span>
+      ${item.label}
+    </button>
+  `).join('');
+    }
+
+    function navigateTo(view) {
+      currentView = view;
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const navEl = document.getElementById(`nav-${view}`);
+      if (navEl) navEl.classList.add('active');
+
+      const views = {
+        dashboard: renderDashboard,
+        sale: renderSaleEntry,
+        products: renderProducts,
+        history: renderHistory,
+        costs: renderCosts,
+        stock: renderStockView,
+        bottles: renderBottles,
+      };
+
+      const fn = views[view];
+      if (fn) fn();
+    }
+
+    // ═══════════════════════════════════════════════
+    //  DASHBOARD (Admin)
+    // ═══════════════════════════════════════════════
+    let dashPeriod = 'today';
+
+    async function renderDashboard() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `
+    <div class="period-tabs">
+      <button class="period-tab ${dashPeriod === 'today' ? 'active' : ''}" onclick="setDashPeriod('today')">Today</button>
+      <button class="period-tab ${dashPeriod === 'week' ? 'active' : ''}" onclick="setDashPeriod('week')">This Week</button>
+      <button class="period-tab ${dashPeriod === 'month' ? 'active' : ''}" onclick="setDashPeriod('month')">This Month</button>
+      <button class="period-tab ${dashPeriod === 'all' ? 'active' : ''}" onclick="setDashPeriod('all')">All Time</button>
+    </div>
+    <div class="loading-center"><div class="spinner"></div></div>
+  `;
+      try {
+        const [data, products] = await Promise.all([
+          apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
+          apiFetch('/api/products')
+        ]);
+        if (!data) return;
+
+        // Market value: stock * (purchaseRate/100) for ml-based products
+        const marketValue = products.reduce((s, p) => {
+          if (p.unit === 'ml' && p.purchaseRate > 0) {
+            return s + (p.stock * (p.purchaseRate / 100));
+          }
+          return s + (p.stock * p.purchaseRate);
+        }, 0);
+
+        // Savings = Revenue - All operational costs
+        const savings = data.totalRevenue - data.totalExtraCosts;
+
+        // Tanjim stock summary
+        const tanjimProducts = products.filter(p => (p.tanjimStock || 0) > 0);
+
+        el.innerHTML = `
+      <div class="period-tabs">
+        ${['today', 'week', 'month', 'all'].map(p => `
+          <button class="period-tab ${dashPeriod === p ? 'active' : ''}" onclick="setDashPeriod('${p}')">${{ today: 'Today', week: 'This Week', month: 'This Month', all: 'All Time' }[p]}</button>
+        `).join('')}
+      </div>
+
+      ${data.lowStockCount > 0 ? `
+        <div class="alert-banner">
+          ⚠️ ${data.lowStockCount} item(s) running low on stock
+          ${data.lowStockItems.map(i => `<br>• ${i.name}: ${i.stock}${i.unit}`).join('')}
+        </div>
+      ` : ''}
+
+      <!-- SAVINGS BANNER -->
+      <div style="background:linear-gradient(135deg,rgba(201,168,76,0.15),rgba(201,168,76,0.05));border:1px solid var(--gold);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem;text-align:center">
+        <div style="font-size:0.65rem;color:var(--text-muted);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:0.3rem">💰 In Your Hand (Savings)</div>
+        <div style="font-size:2rem;font-weight:700;color:var(--gold);font-family:'Cinzel',serif">৳${savings.toLocaleString()}</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.25rem">Revenue ৳${data.totalRevenue.toLocaleString()} − Costs ৳${data.totalExtraCosts.toLocaleString()}</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value">৳${data.totalRevenue.toLocaleString()}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Costs</div>
+          <div class="stat-value danger">৳${data.totalExtraCosts.toLocaleString()}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Sales</div>
+          <div class="stat-value">${data.totalSales}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">📦 Market Value</div>
+          <div class="stat-value" style="font-size:1.1rem">৳${Math.round(marketValue).toLocaleString()}</div>
+        </div>
+      </div>
+
+      <!-- STOCK DISTRIBUTION SUMMARY -->
+      ${tanjimProducts.length > 0 ? `
+        <div class="card">
+          <div class="card-title">🤝 Tanjim's Stock</div>
+          ${tanjimProducts.map(p => `
+            <div class="flex-between" style="padding:0.35rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
+              <span style="font-size:0.85rem">${p.name}</span>
+              <span class="text-gold font-bold" style="font-size:0.85rem">${p.tanjimStock}${p.unit}</span>
+            </div>
+          `).join('')}
+          <div class="flex-between" style="padding:0.5rem 0 0">
+            <span style="font-size:0.78rem;color:var(--text-muted)">Total given</span>
+            <span style="font-size:0.85rem;font-weight:700;color:var(--gold)">${tanjimProducts.reduce((s, p) => s + (p.tanjimStock || 0), 0).toFixed(1)}ml</span>
+          </div>
+        </div>
+      ` : ''}
+
+      ${data.topProducts.length ? `
+        <div class="card">
+          <div class="card-title">Top Selling</div>
+          ${data.topProducts.map((p, i) => `
+            <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
+              <span style="font-size:0.85rem">${i + 1}. ${p.name}</span>
+              <span class="text-gold font-bold" style="font-size:0.85rem">৳${p.revenue.toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${data.recentSales.length ? `
+        <div class="card">
+          <div class="card-title">Recent Sales</div>
+          ${data.recentSales.map(s => `
+            <div class="sale-row">
+              <div class="sale-row-top">
+                <span class="sale-customer">${s.customerName}</span>
+                <span class="sale-amount">৳${s.totalRevenue.toLocaleString()}</span>
+              </div>
+              <div class="sale-row-bot">
+                <span class="sale-date">${new Date(s.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span class="sale-channel">${s.channel}</span>
+                <span class="sale-by">by ${s.soldBy}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No sales recorded yet</div></div>`}
+    `;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function setDashPeriod(p) { dashPeriod = p; renderDashboard(); }
+
+    // ═══════════════════════════════════════════════
+    //  SALE ENTRY
+    // ═══════════════════════════════════════════════
+    let activeSaleStore = 'Main'; // 'Main' or 'tanjim'
+
+    function renderSaleEntry() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `
+    <!-- STORE SELECTOR -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+      <button id="store-Main-btn" onclick="setSaleStore('Main')"
+        style="padding:0.85rem;border-radius:var(--radius);border:2px solid ${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--border)'};
+        background:${activeSaleStore === 'Main' ? 'var(--gold-dim)' : 'var(--dark-3)'};
+        color:${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--text-muted)'};
+        font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;font-size:0.9rem;transition:all 0.15s">
+        🏪 Main Store
+        <div style="font-size:0.65rem;font-weight:400;margin-top:0.2rem;opacity:0.8">Main Stock</div>
+      </button>
+      <button id="store-tanjim-btn" onclick="setSaleStore('tanjim')"
+        style="padding:0.85rem;border-radius:var(--radius);border:2px solid ${activeSaleStore === 'tanjim' ? 'var(--gold)' : 'var(--border)'};
+        background:${activeSaleStore === 'tanjim' ? 'var(--gold-dim)' : 'var(--dark-3)'};
+        color:${activeSaleStore === 'tanjim' ? 'var(--gold)' : 'var(--text-muted)'};
+        font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;font-size:0.9rem;transition:all 0.15s">
+        🤝 Tanjim Store
+        <div style="font-size:0.65rem;font-weight:400;margin-top:0.2rem;opacity:0.8">Branch Stock</div>
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Customer Info</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Name</label>
+          <input class="form-input" id="sale-customer" placeholder="Walk-in"/>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Phone</label>
+          <input class="form-input" id="sale-phone" placeholder="Optional"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Channel</label>
+          <select class="form-select" id="sale-channel">
+            <option value="Direct">Direct</option>
+            <option value="Facebook">Facebook</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="sale-notes" placeholder="Optional"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Items
+        <span style="font-size:0.65rem;font-weight:400;color:var(--text-muted);margin-left:0.5rem">
+          from ${activeSaleStore === 'tanjim' ? "🤝 Tanjim's stock" : '🏪 Main (Main) stock'}
+        </span>
+      </div>
+      <div id="cart-items">
+        <div class="empty-state" style="padding:1.25rem">
+          <div class="empty-icon">🛒</div>
+          <div class="empty-text">No items added yet</div>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-block mt-1" onclick="openAddItemModal()">+ Add Item</button>
+    </div>
+
+    <div class="card" id="extra-costs-card">
+      <div class="card-title">Extra Costs (Per Sale)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Packaging ৳</label>
+          <input class="form-input" type="number" id="ec-packaging" placeholder="0" oninput="updateCartTotal()"/>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Delivery ৳</label>
+          <input class="form-input" type="number" id="ec-delivery" placeholder="0" oninput="updateCartTotal()"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Others ৳</label>
+          <input class="form-input" type="number" id="ec-others" placeholder="0" oninput="updateCartTotal()"/>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Note</label>
+          <input class="form-input" id="ec-note" placeholder="Describe"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="sale-summary">
+      <div class="flex-between">
+        <span class="text-muted" style="font-size:0.85rem">Total Revenue</span>
+        <span class="text-gold font-bold" style="font-size:1.1rem" id="sale-total">৳0</span>
+      </div>
+      <div class="flex-between mt-1">
+        <span class="text-muted" style="font-size:0.85rem">Extra Costs</span>
+        <span class="text-danger" style="font-size:0.9rem" id="sale-costs">-৳0</span>
+      </div>
+      <hr class="divider"/>
+      <div class="flex-between">
+        <span class="font-bold">Net Profit</span>
+        <span class="text-success font-bold" style="font-size:1.2rem" id="sale-profit">৳0</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-block" style="padding:1rem;font-size:1rem;margin-bottom:1rem" onclick="submitSale()">
+      ✓ Record ${activeSaleStore === 'tanjim' ? "Tanjim's" : 'Main'} Sale
+    </button>
+  `;
+      renderCartItems();
+    }
+
+    function setSaleStore(store) {
+      activeSaleStore = store;
+      cart = []; // clear cart when switching store
+      renderSaleEntry();
+    }
+
+    function renderCartItems() {
+      const el = document.getElementById('cart-items');
+      if (!el) return;
+      if (cart.length === 0) {
+        el.innerHTML = `<div class="empty-state" style="padding:1.25rem"><div class="empty-icon">🛒</div><div class="empty-text">No items added yet</div></div>`;
+        updateCartTotal();
+        return;
+      }
+
+      el.innerHTML = cart.map((item, idx) => `
+    <div class="cart-item">
+      <div>
+        <div class="cart-item-name">
+          ${item.name}
+          ${item.itemType === 'Combo' ? '<span class="combo-badge">COMBO</span>' : ''}
+          ${item.isOverridden ? '<span style="background:rgba(224,82,82,0.15);color:#e05252;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">CUSTOM PRICE</span>' : ''}
+        </div>
+     <div class="cart-item-meta" style="display:flex;align-items:center;gap:0.4rem;margin-top:0.3rem">
+  <button class="qty-btn" onclick="changeCartQty(${idx}, -3.5)">−</button>
+  <span class="qty-val">${item.qty}ml</span>
+  <button class="qty-btn" onclick="changeCartQty(${idx}, 3.5)">+</button>
+  <input class="form-input" type="number" step="0.5"
+    style="width:65px;padding:0.25rem 0.4rem;font-size:0.8rem"
+    value="${item.qty}"
+    onchange="setCartQty(${idx}, this.value)"/>
+  <span style="font-size:0.72rem;color:var(--text-muted)">— ৳${item.unitPrice.toFixed(0)}</span>
+</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <span class="cart-item-price">৳${(item.perMlPrice ? item.perMlPrice * item.qty : item.unitPrice).toFixed(0)}</span>
+        <button class="icon-btn" onclick="openOverride(${idx})" title="Override price">✏️</button>
+        <button class="icon-btn" onclick="removeCartItem(${idx})" title="Remove">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+      updateCartTotal();
+    }
+
+    function updateCartTotal() {
+      // 🐞 ফিক্সড লাইন: এখানে শুধু unitPrice যোগ হবে, মিলি দিয়ে গুণ হবে না
+      const total = cart.reduce((s, i) => s + (i.perMlPrice ? i.perMlPrice * i.qty : i.unitPrice), 0);
+
+      const pkg = parseFloat(document.getElementById('ec-packaging')?.value || 0);
+      const del = parseFloat(document.getElementById('ec-delivery')?.value || 0);
+      const oth = parseFloat(document.getElementById('ec-others')?.value || 0);
+      const costs = pkg + del + oth;
+
+      const totalEl = document.getElementById('sale-total');
+      const costsEl = document.getElementById('sale-costs');
+      const profitEl = document.getElementById('sale-profit');
+
+      if (totalEl) totalEl.textContent = `৳${total.toFixed(0)}`;
+      if (costsEl) costsEl.textContent = `-৳${costs.toFixed(0)}`;
+      if (profitEl) profitEl.textContent = `৳${(total - costs).toFixed(0)}`;
+    }
+
+    function removeCartItem(idx) {
+      cart.splice(idx, 1);
+      renderCartItems();
+    }
+
+    async function openAddItemModal() {
+      openModal('add-item-modal');
+      document.getElementById('item-search').value = '';
+      document.getElementById('item-list-container').innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+
+      try {
+        [allProducts, allCombos] = await Promise.all([
+          apiFetch('/api/products'),
+          apiFetch('/api/combos')
+        ]);
+        renderItemList(allProducts, allCombos);
+      } catch (err) {
+        document.getElementById('item-list-container').innerHTML = `<p class="text-danger" style="text-align:center;padding:1rem">${err.message}</p>`;
+      }
+    }
+
+    function filterItems() {
+      const q = document.getElementById('item-search').value.toLowerCase();
+      const fp = allProducts.filter(p => p.name.toLowerCase().includes(q));
+      const fc = allCombos.filter(c => c.name.toLowerCase().includes(q));
+      renderItemList(fp, fc);
+    }
+
+    function renderItemList(products, combos) {
+      const el = document.getElementById('item-list-container');
+      let html = '';
+
+      if (combos && combos.length) {
+        html += `<div class="section-title">Combos</div>`;
+        combos.forEach(c => {
+          const idx = _itemCache.push(c) - 1;
+          _itemCacheTypes.push('Combo');
+          html += `
+        <div class="item-row selectable-item" data-idx="${idx}">
+          <div>
+            <div class="item-name">${c.name} <span class="combo-badge">COMBO</span></div>
+            <div class="item-meta">${(c.products || []).map(p => `${p.productId?.name || '?'} (${p.quantity}ml)`).join(' + ')}</div>
+          </div>
+          <div class="item-stock stock-ok">৳${c.comboPrice}</div>
+        </div>`;
+        });
+      }
+
+      if (products && products.length) {
+        html += `<div class="section-title">Products</div>`;
+        products.forEach(p => {
+          const idx = _itemCache.push(p) - 1;
+          _itemCacheTypes.push('Product');
+          // Show Tanjim's stock if Tanjim store is active
+          const displayStock = activeSaleStore === 'tanjim' ? (p.tanjimStock || 0) : p.stock;
+          const stockClass = displayStock <= p.lowStockAlert ? 'stock-low' : 'stock-ok';
+          const stockLabel = activeSaleStore === 'tanjim'
+            ? `🤝 ${displayStock}${p.unit}` : `${displayStock}${p.unit}`;
+          html += `
+        <div class="item-row selectable-item" data-idx="${idx}" style="${displayStock <= 0 ? 'opacity:0.4;pointer-events:none' : ''}">
+          <div>
+            <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
+            <div class="item-meta">৳${p.sellingPrice}/3.5ml · ৳${(p.sellingPrice / 3.5).toFixed(1)}/ml · ${p.category}</div>
+          </div>
+          <div class="item-stock ${stockClass}">${stockLabel}</div>
+        </div>`;
+        });
+      }
+
+      if (!html) html = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">No items found</div></div>`;
+      el.innerHTML = html;
+
+      // Event delegation - one listener, no inline onclick issues
+      el.querySelectorAll('.selectable-item').forEach(row => {
+        row.addEventListener('click', () => {
+          const idx = parseInt(row.dataset.idx);
+          const type = _itemCacheTypes[idx];
+          const item = _itemCache[idx];
+          if (type === 'Combo') {
+            addToCart(item._id, 'Combo', item.name, item.comboPrice);
+          } else {
+            addToCart(item._id, 'Product', item.name, item.sellingPrice);
+          }
+        });
+      });
+    }
+
+    // Cache to avoid passing data through HTML attributes
+    let _itemCache = [];
+    let _itemCacheTypes = [];
+
+    function addToCart(id, type, name, price) {
+      const existing = cart.find(i => i.itemId === id && i.itemType === type);
+      if (existing) {
+        existing.qty = parseFloat((existing.qty + (type === 'Product' ? 3.5 : 1)).toFixed(1));
+        if (!existing.isOverridden && existing.perMlPrice) {
+          existing.unitPrice = parseFloat((existing.perMlPrice * existing.qty).toFixed(1));
+        }
+      } else {
+        const defaultQty = type === 'Product' ? 3.5 : 1;
+        const perMlPrice = type === 'Product' ? price / 3.5 : null;
+        cart.push({
+          itemId: id,
+          itemType: type,
+          name,
+          qty: defaultQty,
+          unitPrice: price,
+          perMlPrice,
+          originalPrice: price,
+          isOverridden: false
+        });
+      }
+      closeModal('add-item-modal');
+      renderCartItems();
+      showToast(`✓ ${name} added to cart`, 'success');
+    }
+
+    // Price Override
+    function openOverride(idx) {
+      overrideTarget = idx;
+      const item = cart[idx];
+      document.getElementById('override-product-name').textContent = item.name;
+      document.getElementById('override-original').value = `৳${item.originalPrice}`;
+      document.getElementById('override-price').value = item.unitPrice;
+      openModal('override-modal');
+    }
+
+    function changeCartQty(idx, delta) {
+      const item = cart[idx];
+      const newQty = Math.max(0.5, parseFloat((item.qty + delta).toFixed(1)));
+      setCartQty(idx, newQty);
+    }
+
+    function setCartQty(idx, val) {
+      const item = cart[idx];
+      const newQty = parseFloat(parseFloat(val).toFixed(1));
+      if (isNaN(newQty) || newQty <= 0) return;
+      item.qty = newQty;
+      if (!item.isOverridden && item.perMlPrice) {
+        item.unitPrice = parseFloat((item.perMlPrice * newQty).toFixed(1));
+      }
+      renderCartItems();
+    }
+
+    function applyOverride() {
+      const price = parseFloat(document.getElementById('override-price').value);
+      if (isNaN(price) || price < 0) return showToast('Enter a valid price', 'error');
+      cart[overrideTarget].unitPrice = price;
+      cart[overrideTarget].isOverridden = price !== cart[overrideTarget].originalPrice;
+      closeModal('override-modal');
+      renderCartItems();
+    }
+
+    async function submitSale() {
+      if (cart.length === 0) return showToast('Add at least one item', 'error');
+
+      const body = {
+        customerName: document.getElementById('sale-customer').value || 'Walk-in',
+        customerPhone: document.getElementById('sale-phone').value || '',
+        channel: document.getElementById('sale-channel').value,
+        notes: document.getElementById('sale-notes').value,
+        store: activeSaleStore, // 'Main' or 'tanjim'
+        items: cart.map(i => ({
+          itemId: i.itemId,
+          itemType: i.itemType,
+          qty: parseFloat(i.qty),
+          overridePrice: i.isOverridden ? i.unitPrice : undefined
+        })),
+        extraCosts: {
+          packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
+          delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
+          others: parseFloat(document.getElementById('ec-others').value || 0),
+          otherNote: document.getElementById('ec-note').value || ''
+        }
+      };
+
+      try {
+        await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
+        cart = [];
+        showToast(`✓ ${activeSaleStore === 'tanjim' ? "Tanjim's sale" : 'Sale'} recorded!`, 'success');
+        renderSaleEntry();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  PRODUCTS (Admin)
+    // ═══════════════════════════════════════════════
+    let productFilter = 'all';
+
+    async function renderProducts() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+      <div class="period-tabs" style="margin:0;flex:1">
+        <button class="period-tab ${productFilter === 'all' ? 'active' : ''}" onclick="setProductFilter('all')">All</button>
+        <button class="period-tab ${productFilter === 'Attar' ? 'active' : ''}" onclick="setProductFilter('Attar')">Attar</button>
+        <button class="period-tab ${productFilter === 'Apparel' ? 'active' : ''}" onclick="setProductFilter('Apparel')">Apparel</button>
+        <button class="period-tab ${productFilter === 'Gadget' ? 'active' : ''}" onclick="setProductFilter('Gadget')">Gadget</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+      <button class="btn btn-primary btn-sm" onclick="openProductModal()">+ Product</button>
+      <button class="btn btn-success btn-sm" onclick="openModal('combo-modal');loadComboProductOptions()">+ Combo</button>
+    </div>
+    <div class="loading-center"><div class="spinner"></div></div>
+  `;
+
+      try {
+        const url = productFilter !== 'all' ? `/api/products?category=${productFilter}` : '/api/products';
+        const products = await apiFetch(url);
+        allProducts = products;
+
+        el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+        <div class="period-tabs" style="margin:0;flex:1">
+          ${['all', 'Attar', 'Apparel', 'Gadget'].map(f => `<button class="period-tab ${productFilter === f ? 'active' : ''}" onclick="setProductFilter('${f}')">${f === 'all' ? 'All' : f}</button>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="openProductModal()">+ Product</button>
+        <button class="btn btn-success btn-sm" onclick="openModal('combo-modal');loadComboProductOptions()">+ Combo</button>
+        <button class="btn btn-outline btn-sm" onclick="openImportModal()">📥 Import</button>
+        <button class="btn btn-outline btn-sm" onclick="openTanjimModal()">🤝 Give Tanjim</button>
+        <button class="btn btn-outline btn-sm" onclick="navigateTo('bottles')">🍶 Bottles</button>
+      </div>
+      <div class="card" style="margin-bottom:0.75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:0.75rem;color:var(--text-muted)">Total Market Value (buying price)</span>
+          <span style="font-weight:700;color:var(--gold);font-size:1rem" id="market-value-display">Calculating...</span>
+        </div>
+      </div>
+      <div class="card">
+        ${products.length === 0 ? `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No products yet</div></div>` :
+            products.map(p => {
+              const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+              const tanjim = p.tanjimStock || 0;
+              return `
+            <div class="item-row">
+              <div style="flex:1">
+                <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
+                <div class="item-meta">
+                  Sell ৳${p.sellingPrice} · Buy ৳${p.purchaseRate}/100ml · Lot: ${p.lotInfo?.lotName || '—'}
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.2rem;flex-wrap:wrap">
+                  <span style="font-size:0.68rem;color:var(--text-muted)">Market val: <span style="color:var(--gold)">৳${Math.round(mv).toLocaleString()}</span></span>
+                  ${tanjim > 0 ? `<span style="font-size:0.68rem;color:#52c07a">Tanjim: ${tanjim}${p.unit}</span>` : ''}
+                </div>
+              </div>
+              <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem">
+                <span class="item-stock ${p.stock <= p.lowStockAlert ? 'stock-low' : 'stock-ok'}">${p.stock}${p.unit}</span>
+                <div style="display:flex;gap:0.3rem">
+                  <button class="btn btn-outline btn-sm" onclick="openProductModal('${p._id}')">Edit</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p._id}', '${p.name}')">Del</button>
+                </div>
+              </div>
+            </div>`;
+            }).join('')}
+      </div>
+    `;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+      // Calculate and show total market value
+      try {
+        const mv = document.getElementById('market-value-display');
+        if (mv && allProducts.length) {
+          const total = allProducts.reduce((s, p) => {
+            return s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate);
+          }, 0);
+          mv.textContent = `৳${Math.round(total).toLocaleString()}`;
+        }
+      } catch (e) { }
+    }
+
+    async function openProductModal(id = null) {
+      document.getElementById('product-edit-id').value = id || '';
+      document.getElementById('product-modal-title').textContent = id ? 'Edit Product' : 'Add Product';
+
+      if (id) {
+        try {
+          const p = await apiFetch(`/api/products/${id}`);
+          document.getElementById('p-name').value = p.name;
+          document.getElementById('p-category').value = p.category;
+          document.getElementById('p-grade').value = p.grade || '';
+          document.getElementById('p-stock').value = p.stock;
+          document.getElementById('p-unit').value = p.unit;
+          document.getElementById('p-purchase').value = p.purchaseRate;
+          document.getElementById('p-sell').value = p.sellingPrice;
+          document.getElementById('p-lowstock').value = p.lowStockAlert;
+          document.getElementById('p-lot').value = p.lotInfo?.lotName || '';
+          document.getElementById('p-notes').value = p.notes || '';
+        } catch (err) {
+          showToast(err.message, 'error'); return;
+        }
+      } else {
+        ['p-name', 'p-stock', 'p-purchase', 'p-sell', 'p-lot', 'p-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('p-grade').value = '';
+        document.getElementById('p-category').value = 'Attar';
+        document.getElementById('p-unit').value = 'ml';
+        document.getElementById('p-lowstock').value = '10';
+      }
+      openModal('product-modal');
+    }
+
+    async function saveProduct() {
+      const id = document.getElementById('product-edit-id').value;
+      const body = {
+        name: document.getElementById('p-name').value.trim(),
+        category: document.getElementById('p-category').value,
+        grade: document.getElementById('p-grade').value,
+        stock: parseFloat(document.getElementById('p-stock').value) || 0,
+        unit: document.getElementById('p-unit').value,
+        purchaseRate: parseFloat(document.getElementById('p-purchase').value) || 0,
+        sellingPrice: parseFloat(document.getElementById('p-sell').value) || 0,
+        lowStockAlert: parseFloat(document.getElementById('p-lowstock').value) || 10,
+        notes: document.getElementById('p-notes').value,
+        'lotInfo.lotName': document.getElementById('p-lot').value,
+      };
+      if (!body.name) return showToast('Product name required', 'error');
+
+      try {
+        if (id) {
+          await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+          showToast('Product updated ✓', 'success');
+        } else {
+          await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) });
+          showToast('Product added ✓', 'success');
+        }
+        closeModal('product-modal');
+        renderProducts();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteProduct(id, name) {
+      if (!confirm(`Remove "${name}" from product list?`)) return;
+      try {
+        await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
+        showToast('Product removed', 'success');
+        renderProducts();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  TANJIM STOCK DISTRIBUTION
+    // ═══════════════════════════════════════════════
+    let tanjimProductCache = [];
+
+    async function openTanjimModal() {
+      tanjimProductCache = await apiFetch('/api/products') || [];
+      const attars = tanjimProductCache.filter(p => p.category === 'Attar');
+
+      const container = document.getElementById('tanjim-list');
+      container.innerHTML = attars.map((p, i) => `
+    <div style="padding:0.65rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+        <div>
+          <div style="font-size:0.88rem;font-weight:500">${p.name}</div>
+          <div style="font-size:0.7rem;color:var(--text-muted)">Available: ${p.stock}${p.unit} · Already given: ${p.tanjimStock || 0}${p.unit}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center">
+        <span style="font-size:0.72rem;color:var(--text-muted)">Give:</span>
+        ${[3.5, 6, 12, 15].map(qty => `
+          <button class="btn btn-outline btn-sm" style="padding:0.3rem 0.6rem;font-size:0.75rem"
+            onclick="setTanjimQty(${i}, ${qty})">
+            ${qty}ml
+          </button>
+        `).join('')}
+        <input class="form-input" type="number" id="tanjim-qty-${i}"
+          placeholder="custom" step="0.5" min="0"
+          style="width:75px;padding:0.3rem 0.5rem;font-size:0.8rem"
+          value="0"/>
+      </div>
+    </div>
+  `).join('');
+
+      openModal('tanjim-modal');
+    }
+
+    function setTanjimQty(i, qty) {
+      const inp = document.getElementById(`tanjim-qty-${i}`);
+      if (inp) inp.value = qty;
+    }
+
+    async function saveTanjimDistribution() {
+      const attars = tanjimProductCache.filter(p => p.category === 'Attar');
+      let updated = 0;
+      const errors = [];
+
+      for (let i = 0; i < attars.length; i++) {
+        const inp = document.getElementById(`tanjim-qty-${i}`);
+        if (!inp) continue;
+        const qty = parseFloat(inp.value) || 0;
+        if (qty <= 0) continue;
+
+        const p = attars[i];
+        if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
+
+        try {
+          // Deduct from Main stock, add to tanjimStock
+          await apiFetch(`/api/products/${p._id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              ...p,
+              stock: p.stock - qty,
+              tanjimStock: (p.tanjimStock || 0) + qty
+            })
+          });
+          updated++;
+        } catch (e) {
+          errors.push(`${p.name}: ${e.message}`);
+        }
+      }
+
+      if (errors.length) {
+        showToast(errors[0], 'error');
+      } else {
+        showToast(`✓ Updated ${updated} product(s) for Tanjim`, 'success');
+        closeModal('tanjim-modal');
+        renderProducts();
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  BOTTLE TRACKER
+    // ═══════════════════════════════════════════════
+    async function renderBottles() {
+      const el = document.getElementById('Main-content');
+
+      // Load bottles from localStorage (simple, no backend needed)
+      let bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+
+      const totalBottles = bottles.reduce((s, b) => {
+        const obj = {};
+        (b.sizes || []).forEach(s2 => { obj[s2.size] = (obj[s2.size] || 0) + s2.qty; });
+        return s;
+      }, {});
+
+      // Build size summary
+      const sizeSummary = {};
+      bottles.forEach(b => {
+        (b.sizes || []).forEach(s => {
+          sizeSummary[s.size] = (sizeSummary[s.size] || 0) + s.qty;
+        });
+      });
+
+      el.innerHTML = `
+    <div class="card">
+      <div class="card-title">🍶 Bottle Stock</div>
+      ${Object.keys(sizeSummary).length === 0 ?
+          `<div class="empty-state" style="padding:1rem"><div class="empty-icon">🍶</div><div class="empty-text">No bottles added yet</div></div>` :
+          Object.entries(sizeSummary).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([size, qty]) => `
+          <div class="flex-between" style="padding:0.5rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
+            <span style="font-size:0.9rem;font-weight:500">${size}ml bottle</span>
+            <span class="item-stock ${qty <= 5 ? 'stock-low' : 'stock-ok'}">${qty} pcs</span>
+          </div>
+        `).join('')
+        }
+    </div>
+
+    <div class="card">
+      <div class="card-title">Add Bottle Purchase</div>
+      <div id="bottle-sizes-list">
+        <div style="display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center">
+          <select class="form-select bottle-size-sel" style="font-size:0.82rem">
+            ${[3.5, 6, 12, 15, 20, 30, 50, 100].map(s => `<option value="${s}">${s}ml</option>`).join('')}
+          </select>
+          <input class="form-input bottle-qty-inp" type="number" value="10" min="1" placeholder="Qty" style="font-size:0.82rem"/>
+          <button class="btn btn-danger btn-sm" onclick="this.closest('div').remove()">✕</button>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm mb-2" onclick="addBottleSizeRow()">+ Add Size</button>
+
+      <div class="form-group">
+        <label class="form-label">Purchase Cost ৳ (optional)</label>
+        <input class="form-input" type="number" id="bottle-cost" placeholder="0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note</label>
+        <input class="form-input" id="bottle-note" placeholder="e.g. 3.5×5 dozen"/>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="saveBottlePurchase()">Save Bottle Purchase</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Purchase History</div>
+      ${bottles.length === 0 ?
+          `<div class="empty-state" style="padding:1rem"><div class="empty-text">No purchases yet</div></div>` :
+          [...bottles].reverse().map((b, i) => `
+          <div style="padding:0.6rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
+            <div class="flex-between">
+              <div>
+                <div style="font-size:0.85rem;font-weight:500">${(b.sizes || []).map(s => `${s.qty}×${s.size}ml`).join(', ')}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted)">${b.note || ''} · ${new Date(b.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                ${b.cost ? `<span style="color:var(--danger);font-size:0.85rem;font-weight:600">৳${b.cost}</span>` : ''}
+                <button class="btn btn-danger btn-sm" onclick="deleteBottle(${bottles.length - 1 - i})">✕</button>
+              </div>
+            </div>
+          </div>
+        `).join('')
+        }
+    </div>
+  `;
+    }
+
+    function addBottleSizeRow() {
+      const container = document.getElementById('bottle-sizes-list');
+      const row = document.createElement('div');
+      row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+      row.innerHTML = `
+    <select class="form-select bottle-size-sel" style="font-size:0.82rem">
+      ${[3.5, 6, 12, 15, 20, 30, 50, 100].map(s => `<option value="${s}">${s}ml</option>`).join('')}
+    </select>
+    <input class="form-input bottle-qty-inp" type="number" value="10" min="1" placeholder="Qty" style="font-size:0.82rem"/>
+    <button class="btn btn-danger btn-sm" onclick="this.closest('div').remove()">✕</button>
+  `;
+      container.appendChild(row);
+    }
+
+    function saveBottlePurchase() {
+      const sizeEls = document.querySelectorAll('.bottle-size-sel');
+      const qtyEls = document.querySelectorAll('.bottle-qty-inp');
+      const sizes = [];
+      sizeEls.forEach((sel, i) => {
+        const qty = parseInt(qtyEls[i]?.value) || 0;
+        if (qty > 0) sizes.push({ size: parseFloat(sel.value), qty });
+      });
+      if (!sizes.length) return showToast('Add at least one bottle size', 'error');
+
+      const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+      bottles.push({
+        sizes,
+        cost: parseFloat(document.getElementById('bottle-cost').value) || 0,
+        note: document.getElementById('bottle-note').value || '',
+        date: new Date().toISOString()
+      });
+      localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
+
+      // Also record as a cost if cost entered
+      const cost = parseFloat(document.getElementById('bottle-cost').value) || 0;
+      if (cost > 0) {
+        apiFetch('/api/costs', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: `Bottles (${sizes.map(s => `${s.qty}×${s.size}ml`).join(', ')})`,
+            amount: cost,
+            category: 'Packaging',
+            paidStatus: 'Paid'
+          })
+        }).catch(() => { });
+      }
+
+      showToast('✓ Bottle purchase saved', 'success');
+      renderBottles();
+    }
+
+    function deleteBottle(idx) {
+      const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+      bottles.splice(idx, 1);
+      localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
+      renderBottles();
+    }
+
+    // ─── Combo ───
+    async function loadComboProductOptions() {
+      allProducts = await apiFetch('/api/products') || [];
+      const container = document.getElementById('combo-products-list');
+      container.innerHTML = '';
+      addComboProductRow();
+    }
+
+    function addComboProductRow() {
+      const container = document.getElementById('combo-products-list');
+      const row = document.createElement('div');
+      row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+      row.innerHTML = `
+    <select class="form-select" style="font-size:0.82rem">
+      <option value="">Select product</option>
+      ${allProducts.map(p => `<option value="${p._id}">${p.name}</option>`).join('')}
+    </select>
+    <input class="form-input" type="number" value="3.5" placeholder="ml" style="font-size:0.82rem"/>
+    <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>
+  `;
+      container.appendChild(row);
+    }
+
+    async function saveCombo() {
+      const name = document.getElementById('c-name').value.trim();
+      const price = parseFloat(document.getElementById('c-price').value);
+      if (!name || !price) return showToast('Name and price required', 'error');
+
+      const rows = document.getElementById('combo-products-list').querySelectorAll('div');
+      const products = [];
+      for (const row of rows) {
+        const sel = row.querySelector('select');
+        const inp = row.querySelector('input');
+        if (sel?.value && inp?.value) {
+          products.push({ productId: sel.value, quantity: parseFloat(inp.value) });
+        }
+      }
+      if (!products.length) return showToast('Add at least one product to combo', 'error');
+
+      try {
+        await apiFetch('/api/combos', { method: 'POST', body: JSON.stringify({ name, comboPrice: price, products }) });
+        showToast('Combo created ✓', 'success');
+        closeModal('combo-modal');
+        renderProducts();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  SALE HISTORY (Admin)
+    // ═══════════════════════════════════════════════
+    async function renderHistory() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+
+      try {
+        const sales = await apiFetch('/api/sales');
+        if (!sales) return;
+
+        el.innerHTML = `
+      <div class="card">
+        <div class="card-title">Sales History</div>
+        ${sales.length === 0 ? `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-text">No sales yet</div></div>` :
+            sales.map(s => `
+            <div class="sale-row">
+              <div class="sale-row-top">
+                <div>
+                  <div class="sale-customer">${s.customerName}</div>
+                  <div class="item-meta">${s.items.map(i => i.name + (s.items.length > 1 ? '' : '')).join(', ')}</div>
+                </div>
+                <div style="text-align:right">
+                  <div class="sale-amount">৳${s.totalRevenue.toLocaleString()}</div>
+                  <div style="font-size:0.7rem;color:var(--success)">Net ৳${(s.netProfit || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div class="sale-row-bot" style="justify-content:space-between">
+                <div style="display:flex;gap:0.4rem;align-items:center">
+                  <span class="sale-date">${new Date(s.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span class="sale-channel">${s.channel}</span>
+                  ${s.store === 'tanjim' ? `<span style="background:rgba(82,192,122,0.15);color:#52c07a;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🤝 Tanjim</span>` : `<span style="background:var(--gold-dim);color:var(--gold);font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🏪 Main</span>`}
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="deleteSale('${s._id}')">Delete</button>
+              </div>
+            </div>
+          `).join('')}
+      </div>
+    `;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteSale(id) {
+      if (!confirm('Delete this sale? Stock will be restored.')) return;
+      try {
+        await apiFetch(`/api/sales/${id}`, { method: 'DELETE' });
+        showToast('Sale deleted, stock restored', 'success');
+        renderHistory();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  COSTS (Admin)
+    // ═══════════════════════════════════════════════
+    async function renderCosts() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+      try {
+        const costs = await apiFetch('/api/costs');
+        const total = costs.reduce((s, c) => s + c.amount, 0);
+        const due = costs.reduce((s, c) => s + (c.dueAmount || 0), 0);
+
+        el.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Costs</div>
+          <div class="stat-value danger">৳${total.toLocaleString()}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Due</div>
+          <div class="stat-value danger">৳${due.toLocaleString()}</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm mb-2" onclick="openModal('cost-modal')">+ Record Cost</button>
+      <div class="card">
+        ${costs.length === 0 ? `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">No costs recorded</div></div>` :
+            costs.map(c => `
+            <div class="item-row">
+              <div>
+                <div class="item-name">${c.name}</div>
+                <div class="item-meta">${c.category} · ${new Date(c.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+                ${c.paidStatus !== 'Paid' ? `<span style="background:rgba(224,82,82,0.15);color:#e05252;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px">${c.paidStatus} - ৳${c.dueAmount}</span>` : ''}
+              </div>
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <span class="text-danger font-bold">৳${c.amount.toLocaleString()}</span>
+                <button class="btn btn-danger btn-sm" onclick="deleteCost('${c._id}')">✕</button>
+              </div>
+            </div>
+          `).join('')}
+      </div>
+    `;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function saveCost() {
+      const body = {
+        name: document.getElementById('cost-name').value.trim(),
+        amount: parseFloat(document.getElementById('cost-amount').value) || 0,
+        category: document.getElementById('cost-cat').value,
+        paidStatus: document.getElementById('cost-status').value,
+        dueAmount: parseFloat(document.getElementById('cost-due').value) || 0,
+        notes: document.getElementById('cost-notes').value,
+      };
+      if (!body.name || !body.amount) return showToast('Name and amount required', 'error');
+      try {
+        await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(body) });
+        showToast('Cost recorded ✓', 'success');
+        closeModal('cost-modal');
+        renderCosts();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteCost(id) {
+      if (!confirm('Delete this cost entry?')) return;
+      try {
+        await apiFetch(`/api/costs/${id}`, { method: 'DELETE' });
+        showToast('Deleted', 'success');
+        renderCosts();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  STOCK VIEW (Assistant)
+    // ═══════════════════════════════════════════════
+    async function renderStockView() {
+      const el = document.getElementById('Main-content');
+      el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+      try {
+        const data = await apiFetch('/api/dashboard/assistant');
+        const low = data.products.filter(p => p.stock <= p.lowStockAlert);
+
+        el.innerHTML = `
+      ${low.length ? `<div class="alert-banner">⚠️ ${low.length} item(s) low on stock</div>` : ''}
+      <div class="card">
+        <div class="card-title">Current Stock</div>
+        ${data.products.map(p => `
+          <div class="item-row">
+            <div class="item-name">${p.name}</div>
+            <span class="item-stock ${p.stock <= p.lowStockAlert ? 'stock-low' : 'stock-ok'}">${p.stock}${p.unit}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  MODAL & TOAST HELPERS
+    // ═══════════════════════════════════════════════
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    // Close modal on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('open');
+      });
+    });
+
+    let toastTimer;
+    function showToast(msg, type = '') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = `show ${type}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { t.className = ''; }, 2500);
+    }
+
+    // ═══════════════════════════════════════════════
+    //  BULK IMPORT
+    // ═══════════════════════════════════════════════
+    let importTab = 'products';
+
+    function openImportModal() {
+      importTab = 'products';
+      switchImportTab('products');
+      document.getElementById('imp-progress-wrap').style.display = 'none';
+      document.getElementById('imp-result').style.display = 'none';
+      document.getElementById('imp-submit-btn').disabled = false;
+      openModal('import-modal');
+    }
+
+    function switchImportTab(tab) {
+      importTab = tab;
+      ['products', 'sales', 'costs'].forEach(t => {
+        document.getElementById(`imp-${t}-panel`).style.display = t === tab ? 'block' : 'none';
+        document.getElementById(`imp-tab-${t}`).classList.toggle('active', t === tab);
+      });
+      document.getElementById('imp-result').style.display = 'none';
+    }
+
+    // ── Parse helpers ──
+    function parseProductLines(raw) {
+      const category = document.getElementById('imp-category').value;
+      const unit = document.getElementById('imp-unit').value;
+      const rows = [];
+      const errors = [];
+
+      raw.split('\n').forEach((line, i) => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const parts = line.split(',').map(s => s.trim());
+        if (parts.length < 5) { errors.push(`Line ${i + 1}: needs at least 5 fields (Name, Grade, Stock, PurchaseRate, SellingPrice)`); return; }
+        const [name, grade, stockRaw, purchaseRaw, sellRaw, lotName] = parts;
+        const stock = parseFloat(stockRaw);
+        const purchaseRate = parseFloat(purchaseRaw);
+        const sellingPrice = parseFloat(sellRaw);
+        if (!name) { errors.push(`Line ${i + 1}: Name is empty`); return; }
+        if (isNaN(stock) || isNaN(purchaseRate) || isNaN(sellingPrice)) { errors.push(`Line ${i + 1}: Stock/Rate/Price must be numbers`); return; }
+        rows.push({ name, grade: grade || '', stock, purchaseRate, sellingPrice, unit, category, lotInfo: { lotName: lotName || '' }, lowStockAlert: unit === 'ml' ? 10 : 2 });
+      });
+      return { rows, errors };
+    }
+
+    function parseSaleLines(raw) {
+      const rows = [];
+      const errors = [];
+      raw.split('\n').forEach((line, i) => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const parts = line.split(',').map(s => s.trim());
+        if (parts.length < 4) { errors.push(`Line ${i + 1}: needs CustomerName, ProductName, Qty, Amount`); return; }
+        const [customerName, productName, qtyRaw, amountRaw, dateRaw] = parts;
+        const qty = parseFloat(qtyRaw);
+        const amount = parseFloat(amountRaw);
+        if (isNaN(qty) || isNaN(amount)) { errors.push(`Line ${i + 1}: Qty and Amount must be numbers`); return; }
+        let date = new Date();
+        if (dateRaw) { const d = new Date(dateRaw); if (!isNaN(d)) date = d; }
+        rows.push({ customerName, productName, qty, amount, date });
+      });
+      return { rows, errors };
+    }
+
+    function parseCostLines(raw) {
+      const validCats = ['Raw', 'Packaging', 'Equipment', 'Food', 'Marketing', 'Other'];
+      const validStatus = ['Paid', 'Due', 'Partial'];
+      const rows = [];
+      const errors = [];
+      raw.split('\n').forEach((line, i) => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return;
+        const parts = line.split(',').map(s => s.trim());
+        if (parts.length < 2) { errors.push(`Line ${i + 1}: needs at least Name, Amount`); return; }
+        const [name, amountRaw, category, paidStatus] = parts;
+        const amount = parseFloat(amountRaw);
+        if (!name || isNaN(amount)) { errors.push(`Line ${i + 1}: Name and Amount required`); return; }
+        rows.push({
+          name, amount,
+          category: validCats.includes(category) ? category : 'Other',
+          paidStatus: validStatus.includes(paidStatus) ? paidStatus : 'Paid'
+        });
+      });
+      return { rows, errors };
+    }
+
+    // ── Show preview before importing ──
+    function showImportPreview(rows, errors, tab) {
+      const el = document.getElementById(`imp-${tab}-preview`);
+      if (!el) return;
+      let html = '';
+      if (errors.length) {
+        html += `<div style="background:rgba(224,82,82,0.1);border:1px solid rgba(224,82,82,0.3);border-radius:8px;padding:0.6rem;margin-bottom:0.5rem;font-size:0.75rem;color:var(--danger)">
+      ⚠️ ${errors.length} error(s):<br>${errors.slice(0, 5).join('<br>')}${errors.length > 5 ? `<br>...and ${errors.length - 5} more` : ''}</div>`;
+      }
+      if (rows.length) {
+        html += `<div style="background:rgba(82,192,122,0.08);border:1px solid rgba(82,192,122,0.2);border-radius:8px;padding:0.6rem;font-size:0.75rem;color:var(--success)">
+      ✓ ${rows.length} row(s) ready to import</div>`;
+      }
+      el.innerHTML = html;
+    }
+
+    // ── Live preview as user types ──
+    document.addEventListener('DOMContentLoaded', () => {
+      ['products', 'sales', 'costs'].forEach(tab => {
+        const el = document.getElementById(`imp-${tab}-text`);
+        if (el) el.addEventListener('input', () => {
+          if (importTab !== tab) return;
+          const raw = el.value;
+          if (tab === 'products') { const { rows, errors } = parseProductLines(raw); showImportPreview(rows, errors, tab); }
+          if (tab === 'sales') { const { rows, errors } = parseSaleLines(raw); showImportPreview(rows, errors, tab); }
+          if (tab === 'costs') { const { rows, errors } = parseCostLines(raw); showImportPreview(rows, errors, tab); }
+        });
+      });
+    });
+
+    // ── Run Import ──
+    async function runImport() {
+      const btn = document.getElementById('imp-submit-btn');
+      btn.disabled = true;
+
+      const progressWrap = document.getElementById('imp-progress-wrap');
+      const progressBar = document.getElementById('imp-progress-bar');
+      const progressLabel = document.getElementById('imp-progress-label');
+      const progressCount = document.getElementById('imp-progress-count');
+      const resultEl = document.getElementById('imp-result');
+      resultEl.style.display = 'none';
+
+      let rows = [], errors = [];
+
+      if (importTab === 'products') {
+        const raw = document.getElementById('imp-products-text').value;
+        ({ rows, errors } = parseProductLines(raw));
+      } else if (importTab === 'sales') {
+        const raw = document.getElementById('imp-sales-text').value;
+        ({ rows, errors } = parseSaleLines(raw));
+      } else if (importTab === 'costs') {
+        const raw = document.getElementById('imp-costs-text').value;
+        ({ rows, errors } = parseCostLines(raw));
+      }
+
+      if (errors.length && !rows.length) {
+        resultEl.style.display = 'block';
+        resultEl.style.background = 'rgba(224,82,82,0.1)';
+        resultEl.style.border = '1px solid rgba(224,82,82,0.3)';
+        resultEl.style.color = 'var(--danger)';
+        resultEl.innerHTML = `❌ Fix these errors first:<br>${errors.join('<br>')}`;
+        btn.disabled = false;
+        return;
+      }
+
+      if (!rows.length) {
+        showToast('Nothing to import — paste your data first', 'error');
+        btn.disabled = false;
+        return;
+      }
+
+      // Show progress
+      progressWrap.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      let succeeded = 0, failed = 0, failedLines = [];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        progressLabel.textContent = `Importing ${importTab}...`;
+        progressCount.textContent = `${i + 1} / ${rows.length}`;
+        progressBar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
+
+        try {
+          if (importTab === 'products') {
+            await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(row) });
+          } else if (importTab === 'sales') {
+            // For historical sales, we post directly with a special flag (no stock deduction)
+            // We find the product by name first
+            const matchedProduct = allProducts.find(p => p.name.toLowerCase() === row.productName.toLowerCase());
+            const body = {
+              customerName: row.customerName,
+              items: [{
+                itemId: matchedProduct?._id || '000000000000000000000000',
+                itemType: 'Product',
+                qty: row.qty,
+                overridePrice: row.amount / row.qty  // per unit price
+              }],
+              date: row.date,
+              notes: 'Historical import',
+              historicalImport: true  // backend can check this to skip stock deduction
+            };
+            await apiFetch('/api/sales/import', { method: 'POST', body: JSON.stringify(body) });
+          } else if (importTab === 'costs') {
+            await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(row) });
+          }
+          succeeded++;
+        } catch (err) {
+          failed++;
+          failedLines.push(`Row ${i + 1} (${row.name || row.customerName || '?'}): ${err.message}`);
+        }
+
+        // Small delay to avoid hammering the server
+        await new Promise(r => setTimeout(r, 80));
+      }
+
+      progressBar.style.width = '100%';
+      progressLabel.textContent = 'Done!';
+
+      // Show result
+      resultEl.style.display = 'block';
+      if (failed === 0) {
+        resultEl.style.background = 'rgba(82,192,122,0.1)';
+        resultEl.style.border = '1px solid rgba(82,192,122,0.3)';
+        resultEl.style.color = 'var(--success)';
+        resultEl.innerHTML = `✅ Successfully imported <strong>${succeeded}</strong> ${importTab}!`;
+        showToast(`${succeeded} ${importTab} imported ✓`, 'success');
+        // Refresh the products list if we're on products tab
+        if (importTab === 'products') { allProducts = await apiFetch('/api/products') || []; }
+      } else {
+        resultEl.style.background = 'rgba(201,168,76,0.08)';
+        resultEl.style.border = '1px solid rgba(201,168,76,0.2)';
+        resultEl.style.color = 'var(--text)';
+        resultEl.innerHTML = `⚠️ ${succeeded} imported, ${failed} failed:<br><span style="font-size:0.72rem;color:var(--danger)">${failedLines.slice(0, 5).join('<br>')}</span>`;
+      }
+
+      btn.disabled = false;
+    }
+
+    // ═══════════════════════════════════════════════
+    //  AUTO-LOGIN if token exists
+    // ═══════════════════════════════════════════════
+    if (token && role) {
+      // Verify token is still valid
+      fetch('/api/dashboard/assistant', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => {
+        if (r.ok) initApp();
+        else logout();
+      }).catch(() => logout());
+    }
+  </script>
+</body>
+
+</html>
