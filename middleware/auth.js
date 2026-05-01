@@ -1,24 +1,29 @@
 const jwt = require('jsonwebtoken');
 
-// টোকেন চেক করার ফাংশন
 const auth = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ message: 'No token, access denied' });
+
   try {
-    const token = req.header('Authorization').replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { role: 'admin' বা 'assistant' }
+    req.user = decoded;
     next();
-  } catch (error) {
-    res.status(401).json({ message: 'Authentication required' });
+  } catch {
+    res.status(401).json({ message: 'Invalid token' });
   }
 };
 
-// শুধুমাত্র এডমিনদের জন্য ফাংশন
 const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    res.status(403).json({ message: 'Admin access required' });
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ message: 'Admin access required' });
   }
+  next();
 };
 
-module.exports = { auth, adminOnly };
+const can = (permission) => (req, res, next) => {
+  if (req.user?.role === 'admin') return next();
+  if (req.user?.permissions?.[permission]) return next();
+  return res.status(403).json({ message: `Permission denied: ${permission}` });
+};
+
+module.exports = { auth, adminOnly, can };
