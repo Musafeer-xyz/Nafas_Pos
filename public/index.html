@@ -1788,9 +1788,9 @@
           ${item.isOverridden ? '<span style="background:rgba(224,82,82,0.15);color:#e05252;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">CUSTOM PRICE</span>' : ''}
         </div>
         <div class="cart-item-meta" style="display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
-          <button class="qty-btn" onclick="changeCartQty(${idx}, -3.5)">−</button>
+          <button class="qty-btn" onclick="changeCartQty(${idx}, -.5)">−</button>
           <span class="qty-val">${item.qty}ml</span>
-          <button class="qty-btn" onclick="changeCartQty(${idx}, 3.5)">+</button>
+          <button class="qty-btn" onclick="changeCartQty(${idx}, .5)">+</button>
           <input class="form-input" type="number" step="0.5" min="0.5"
             style="width:60px;padding:0.25rem 0.4rem;font-size:0.8rem"
             value="${item.qty}"
