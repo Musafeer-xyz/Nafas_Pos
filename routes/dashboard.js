@@ -3,24 +3,24 @@ const router = express.Router();
 const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const ExtraCost = require('../models/ExtraCost');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, can } = require('../middleware/auth');
 
-// GET dashboard stats - admin only
-router.get('/stats', auth, adminOnly, async (req, res) => {
+// GET dashboard stats - requires viewDashboard permission
+router.get('/stats', auth, can('viewDashboard'), async (req, res) => {
   try {
     const { period } = req.query; // 'today', 'week', 'month', 'all'
-    
+
     let dateFilter = {};
     const now = new Date();
-    
+
     if (period === 'today') {
-      const start = new Date(now); start.setHours(0,0,0,0);
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
       dateFilter = { date: { $gte: start } };
     } else if (period === 'week') {
       const start = new Date(now); start.setDate(now.getDate() - 7);
       dateFilter = { date: { $gte: start } };
     } else if (period === 'month') {
-      const start = new Date(now); start.setDate(1); start.setHours(0,0,0,0);
+      const start = new Date(now); start.setDate(1); start.setHours(0, 0, 0, 0);
       dateFilter = { date: { $gte: start } };
     }
 

@@ -1796,7 +1796,7 @@
             value="${item.qty}"
             onchange="setCartQty(${idx}, this.value)"/>
           <span style="font-size:0.7rem;color:var(--text-muted)">
-            ৳${item.perMlPrice ? item.perMlPrice.toFixed(1) : item.unitPrice}/ml
+            ৳${item.perMlPrice ? item.perMlPrice.toFixed(1) : (item.unitPrice / item.qty).toFixed(1)}/ml
           </span>
         </div>
       </div>
@@ -1894,7 +1894,7 @@
         <div class="item-row selectable-item" data-idx="${idx}" style="${displayStock <= 0 ? 'opacity:0.4;pointer-events:none' : ''}">
           <div>
             <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
-            <div class="item-meta">৳${p.sellingPrice} · ${p.category}</div>
+            <div class="item-meta">৳${p.sellingPrice}/3.5ml · ${p.category}</div>
           </div>
           <div class="item-stock ${stockClass}">${stockLabel}</div>
         </div>`;
@@ -1933,8 +1933,9 @@
           itemType: type,
           name,
           qty: type === 'Product' ? 3.5 : 1,
-          unitPrice: price,
+          unitPrice: price,           // base price (3.5ml price for products)
           originalPrice: price,
+          perMlPrice: type === 'Product' ? price / 3.5 : null,
           isOverridden: false
         });
       }
@@ -1943,21 +1944,44 @@
       showToast(`✓ ${name} added to cart`, 'success');
     }
 
+    // ── Qty controls ──
+    function changeCartQty(idx, delta) {
+      const item = cart[idx];
+      const newQty = Math.max(0.5, parseFloat((item.qty + delta).toFixed(1)));
+      setCartQty(idx, newQty);
+    }
+
+    function setCartQty(idx, val) {
+      const newQty = parseFloat(parseFloat(val).toFixed(1));
+      if (isNaN(newQty) || newQty <= 0) return;
+      const item = cart[idx];
+      item.qty = newQty;
+      // For products: unitPrice stays as 3.5ml base price, perMlPrice drives total
+      // For overridden: don't touch unitPrice, just update qty
+      renderCartItems();
+      updateCartTotal();
+    }
+
     // Price Override
     function openOverride(idx) {
       overrideTarget = idx;
       const item = cart[idx];
       document.getElementById('override-product-name').textContent = item.name;
-      document.getElementById('override-original').value = `৳${item.originalPrice}`;
-      document.getElementById('override-price').value = item.unitPrice;
+      // Show current total price as the override reference
+      const currentTotal = item.perMlPrice ? item.perMlPrice * item.qty : item.unitPrice;
+      document.getElementById('override-original').value = `৳${item.originalPrice} (3.5ml base)`;
+      document.getElementById('override-price').value = Math.round(currentTotal);
       openModal('override-modal');
     }
 
     function applyOverride() {
       const price = parseFloat(document.getElementById('override-price').value);
       if (isNaN(price) || price < 0) return showToast('Enter a valid price', 'error');
-      cart[overrideTarget].unitPrice = price;
-      cart[overrideTarget].isOverridden = price !== cart[overrideTarget].originalPrice;
+      const item = cart[overrideTarget];
+      // Override: store as perMlPrice so qty changes still work
+      item.perMlPrice = price / item.qty;
+      item.unitPrice = price;
+      item.isOverridden = true;
       closeModal('override-modal');
       renderCartItems();
     }
