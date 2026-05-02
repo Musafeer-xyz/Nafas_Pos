@@ -2,6 +2,7 @@ const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Combo = require('../models/Combo');
 const mongoose = require('mongoose');
+const { customerName, customerPhone, items, extraCosts, channel, notes, store, date } = req.body;
 
 // POST: Record a new sale (handles products + combos, deducts stock)
 exports.create = async (req, res) => {
@@ -96,7 +97,8 @@ exports.create = async (req, res) => {
       soldBy,
       store: store || 'siam',
       channel: channel || 'Direct',
-      notes: notes || ''
+      notes: notes || '',
+      date: date ? new Date(date) : new Date()
     });
 
     await sale.save({ session });
