@@ -3285,12 +3285,28 @@
     });
 
     let toastTimer;
+
     function showToast(msg, type = '') {
       const t = document.getElementById('toast');
+
+      // ১. যদি আগে থেকে ওপেন থাকে, সেটা রিমুভ করো
+      t.classList.remove('show');
+
+      // ২. নতুন টেক্সট এবং কালারের ক্লাস (success/error) বসাও
       t.textContent = msg;
-      t.className = `show ${type}`;
+      t.className = type;
+
+      // ৩. ম্যাজিক লাইন (Force Reflow): এটা ব্রাউজারকে বাধ্য করবে অ্যানিমেশনের আগেই টেক্সট রেডি করতে
+      void t.offsetWidth;
+
+      // ৪. এবার show ক্লাস অ্যাড করে অ্যানিমেশন শুরু করো
+      t.classList.add('show');
+
+      // ৫. টাইমার সেট করো
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => { t.className = ''; }, 2500);
+      toastTimer = setTimeout(() => {
+        t.classList.remove('show');
+      }, 2500);
     }
 
     // ═══════════════════════════════════════════════
