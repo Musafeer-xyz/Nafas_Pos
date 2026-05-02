@@ -1140,7 +1140,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem">
         <div class="form-group" style="margin:0">
           <label class="form-label">Name *</label>
-          <input class="form-input" id="u-name" placeholder="e.g. Siam" />
+          <input class="form-input" id="u-name" placeholder="e.g. Main" />
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label">PIN * (4 digits)</label>
@@ -1187,8 +1187,8 @@
         </label>
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-          <input type="checkbox" id="perm-sellSiam" style="width:16px;height:16px;accent-color:var(--gold)" />
-          <span style="font-size:0.82rem">🏪 Record Sales (Siam Store)</span>
+          <input type="checkbox" id="perm-sellMain" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🏪 Record Sales (Main Store)</span>
         </label>
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
@@ -1462,27 +1462,24 @@
         ? `👑 ${displayName}` : `👤 ${displayName}`;
       buildNav();
       // Start on dashboard for admin, sale for others
-      navigateTo(role === 'admin' ? 'dashboard' : (can('sellSiam') || can('sellTanjim') ? 'sale' : 'stock'));
+      navigateTo(role === 'admin' ? 'dashboard' : (can('sellMain') || can('sellTanjim') ? 'sale' : 'stock'));
     }
 
     function buildNav() {
       const nav = document.getElementById('bottom-nav');
 
-      // Build nav items based on permissions
       const items = [];
-      if (can('viewDashboard')) items.push({ id: 'dashboard', icon: '📊', label: 'Dashboard' });
-      if (can('sellSiam') || can('sellTanjim')) items.push({ id: 'sale', icon: '🛒', label: 'Sale' });
-      if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: '📦', label: 'Products' });
-      if (can('viewHistory')) items.push({ id: 'history', icon: '🧾', label: 'History' });
-      if (can('manageCosts')) items.push({ id: 'costs', icon: '💸', label: 'Costs' });
-      if (role === 'admin') items.push({ id: 'users', icon: '👥', label: 'Users' });
-
-      // Fallback: always show stock view if nothing else
-      if (items.length === 0) items.push({ id: 'stock', icon: '📦', label: 'Stock' });
+      if (can('viewDashboard')) items.push({ id: 'dashboard', icon: 'dashboard', label: 'Dashboard' });
+      if (can('sellSiam') || can('sellTanjim')) items.push({ id: 'sale', icon: 'sale', label: 'Sale' });
+      if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: 'products', label: 'Products' });
+      if (can('viewHistory')) items.push({ id: 'history', icon: 'history', label: 'History' });
+      if (can('manageCosts')) items.push({ id: 'costs', icon: 'costs', label: 'Costs' });
+      if (role === 'admin') items.push({ id: 'users', icon: 'users', label: 'Users' });
+      if (items.length === 0) items.push({ id: 'stock', icon: 'stock', label: 'Stock' });
 
       nav.innerHTML = items.map(item => `
     <button class="nav-item" id="nav-${item.id}" onclick="navigateTo('${item.id}')">
-      <span class="icon">${item.icon}</span>
+      <span class="nav-icon">${ICONS[item.icon]}</span>
       ${item.label}
     </button>
   `).join('');
@@ -1589,7 +1586,7 @@
       <!-- STOCK DISTRIBUTION SUMMARY -->
       ${tanjimProducts.length > 0 ? `
         <div class="card">
-          <div class="card-title">🤝 Tanjim's Stock</div>
+          <div class="card-title">${icon('tanjim')}Tanjim's Stock</div>
           ${tanjimProducts.map(p => `
             <div class="flex-between" style="padding:0.35rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
               <span style="font-size:0.85rem">${p.name}</span>
@@ -1605,7 +1602,7 @@
 
       ${data.topProducts.length ? `
         <div class="card">
-          <div class="card-title">Top Selling</div>
+          <div class="card-title">${icon('topSell')}Top Selling</div>
           ${data.topProducts.map((p, i) => `
             <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
               <span style="font-size:0.85rem">${i + 1}. ${p.name}</span>
@@ -1617,7 +1614,7 @@
 
       ${data.recentSales.length ? `
         <div class="card">
-          <div class="card-title">Recent Sales</div>
+          <div class="card-title">${icon('recent')}Recent Sales</div>
           ${data.recentSales.map(s => `
             <div class="sale-row">
               <div class="sale-row-top">
@@ -1644,20 +1641,20 @@
     // ═══════════════════════════════════════════════
     //  SALE ENTRY
     // ═══════════════════════════════════════════════
-    let activeSaleStore = 'siam'; // 'siam' or 'tanjim'
+    let activeSaleStore = 'Main'; // 'Main' or 'tanjim'
 
     function renderSaleEntry() {
       const el = document.getElementById('main-content');
       el.innerHTML = `
     <!-- STORE SELECTOR -->
-    <div style="display:grid;grid-template-columns:${can('sellSiam') && can('sellTanjim') ? '1fr 1fr' : '1fr'};gap:0.5rem;margin-bottom:0.75rem">
-      ${can('sellSiam') ? `
-      <button id="store-siam-btn" onclick="setSaleStore('siam')"
-        style="padding:0.85rem;border-radius:var(--radius);border:2px solid ${activeSaleStore === 'siam' ? 'var(--gold)' : 'var(--border)'};
-        background:${activeSaleStore === 'siam' ? 'var(--gold-dim)' : 'var(--dark-3)'};
-        color:${activeSaleStore === 'siam' ? 'var(--gold)' : 'var(--text-muted)'};
+    <div style="display:grid;grid-template-columns:${can('sellMain') && can('sellTanjim') ? '1fr 1fr' : '1fr'};gap:0.5rem;margin-bottom:0.75rem">
+      ${can('sellMain') ? `
+      <button id="store-Main-btn" onclick="setSaleStore('Main')"
+        style="padding:0.85rem;border-radius:var(--radius);border:2px solid ${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--border)'};
+        background:${activeSaleStore === 'Main' ? 'var(--gold-dim)' : 'var(--dark-3)'};
+        color:${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--text-muted)'};
         font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;font-size:0.9rem;transition:all 0.15s">
-        🏪 Siam Store
+        🏪 Main Store
         <div style="font-size:0.65rem;font-weight:400;margin-top:0.2rem;opacity:0.8">Main Stock</div>
       </button>` : ''}
       ${can('sellTanjim') ? `
@@ -1672,7 +1669,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Customer Info</div>
+      <div class="card-title">${icon('customer')}Customer Info</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div class="form-group" style="margin:0">
           <label class="form-label">Name</label>
@@ -1701,9 +1698,9 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Items
+      <div class="card-title">${icon('cart')}Items
         <span style="font-size:0.65rem;font-weight:400;color:var(--text-muted);margin-left:0.5rem">
-          from ${activeSaleStore === 'tanjim' ? "🤝 Tanjim's stock" : '🏪 Siam (main) stock'}
+          from ${activeSaleStore === 'tanjim' ? "🤝 Tanjim's stock" : '🏪 Main (main) stock'}
         </span>
       </div>
       <div id="cart-items">
@@ -1716,7 +1713,7 @@
     </div>
 
     <div class="card" id="extra-costs-card">
-      <div class="card-title">Extra Costs (Per Sale)</div>
+      <div class="card-title">${icon('costs')}Extra Costs (Per Sale)</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div class="form-group" style="margin:0">
           <label class="form-label">Packaging ৳</label>
@@ -1756,7 +1753,7 @@
     </div>
 
     <button class="btn btn-primary btn-block" style="padding:1rem;font-size:1rem;margin-bottom:1rem" onclick="submitSale()">
-      ✓ Record ${activeSaleStore === 'tanjim' ? "Tanjim's" : 'Siam'} Sale
+      ✓ Record ${activeSaleStore === 'tanjim' ? "Tanjim's" : 'Main'} Sale
     </button>
   `;
       renderCartItems();
@@ -2000,7 +1997,7 @@
         customerPhone: document.getElementById('sale-phone').value || '',
         channel: document.getElementById('sale-channel').value,
         notes: document.getElementById('sale-notes').value,
-        store: activeSaleStore, // 'siam' or 'tanjim'
+        store: activeSaleStore, // 'Main' or 'tanjim'
         items: cart.map(i => ({
           itemId: i.itemId,
           itemType: i.itemType,
@@ -2295,7 +2292,7 @@
 
       el.innerHTML = `
     <div class="card">
-      <div class="card-title">🍶 Bottle Stock</div>
+      <div class="card-title">${icon('bottle')}Bottle Stock</div>
       ${Object.keys(sizeSummary).length === 0 ?
           `<div class="empty-state" style="padding:1rem"><div class="empty-icon">🍶</div><div class="empty-text">No bottles added yet</div></div>` :
           Object.entries(sizeSummary).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([size, qty]) => `
@@ -2308,7 +2305,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Add Bottle Purchase</div>
+      <div class="card-title">${icon('bottle')}Add Bottle Purchase</div>
       <div id="bottle-sizes-list">
         <div style="display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center">
           <select class="form-select bottle-size-sel" style="font-size:0.82rem">
@@ -2332,7 +2329,7 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Purchase History</div>
+      <div class="card-title">${icon('history')}Purchase History</div>
       ${bottles.length === 0 ?
           `<div class="empty-state" style="padding:1rem"><div class="empty-text">No purchases yet</div></div>` :
           [...bottles].reverse().map((b, i) => `
@@ -2474,7 +2471,7 @@
 
         el.innerHTML = `
       <div class="card">
-        <div class="card-title">Sales History</div>
+        <div class="card-title">${icon('history')}Sales History</div>
         ${sales.length === 0 ? `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-text">No sales yet</div></div>` :
             sales.map(s => `
             <div class="sale-row">
@@ -2492,7 +2489,7 @@
                 <div style="display:flex;gap:0.4rem;align-items:center">
                   <span class="sale-date">${new Date(s.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   <span class="sale-channel">${s.channel}</span>
-                  ${s.store === 'tanjim' ? `<span style="background:rgba(82,192,122,0.15);color:#52c07a;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🤝 Tanjim</span>` : `<span style="background:var(--gold-dim);color:var(--gold);font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🏪 Siam</span>`}
+                  ${s.store === 'tanjim' ? `<span style="background:rgba(82,192,122,0.15);color:#52c07a;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🤝 Tanjim</span>` : `<span style="background:var(--gold-dim);color:var(--gold);font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px">🏪 Main</span>`}
                 </div>
                 <button class="btn btn-danger btn-sm" onclick="deleteSale('${s._id}')">Delete</button>
               </div>
@@ -2731,7 +2728,7 @@
         const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(' + ');
         const ec = (s.extraCosts?.packaging || 0) + (s.extraCosts?.delivery || 0) + (s.extraCosts?.others || 0);
         csv += [fmtDate(s.date), esc(s.customerName), esc(items),
-        s.store || 'siam', s.channel, s.totalRevenue, ec,
+        s.store || 'Main', s.channel, s.totalRevenue, ec,
         s.netProfit || 0, s.soldBy].join(',') + '\n';
       });
 
@@ -2782,6 +2779,9 @@
   .success { color: #2a9d5c; font-weight: bold; }
   .gold { color: #c9a84c; font-weight: bold; }
   @media print { body { padding: 15px; } }
+  /* ── SVG Icon System ── */
+.nav-icon svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.section-icon svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: middle; margin-right: 0.35rem; margin-top: -2px; }
 </style>
 </head>
 <body>
@@ -2836,7 +2836,7 @@
       <td>${fmtDate(s.date)}</td>
       <td>${s.customerName}</td>
       <td style="max-width:180px">${items}</td>
-      <td><span class="tag">${s.store || 'siam'}</span></td>
+      <td><span class="tag">${s.store || 'Main'}</span></td>
       <td class="gold">৳${s.totalRevenue}</td>
       <td class="success">৳${s.netProfit || 0}</td>
       <td>${s.soldBy}</td>
@@ -2881,7 +2881,7 @@
         el.innerHTML = `
       ${low.length ? `<div class="alert-banner">⚠️ ${low.length} item(s) low on stock</div>` : ''}
       <div class="card">
-        <div class="card-title">Current Stock</div>
+        <div class="card-title">${icon('stock')}Current Stock</div>
         ${data.products.map(p => `
           <div class="item-row">
             <div class="item-name">${p.name}</div>
@@ -2924,7 +2924,7 @@
       { key: 'viewDashboard', label: '📊 View Dashboard & Revenue' },
       { key: 'viewStock', label: '📦 View Stock' },
       { key: 'viewHistory', label: '🧾 View Sale History' },
-      { key: 'sellSiam', label: '🏪 Record Sales (Siam Store)' },
+      { key: 'sellMain', label: '🏪 Record Sales (Main Store)' },
       { key: 'sellTanjim', label: '🤝 Record Sales (Tanjim Store)' },
       { key: 'addProducts', label: '➕ Add / Edit Products' },
       { key: 'manageCosts', label: '💸 Manage Costs' },
@@ -2945,7 +2945,7 @@
         ${users.length === 0 ? `
           <div class="empty-state">
             <div class="empty-icon">👥</div>
-            <div class="empty-text">No users yet. Add Siam or others.</div>
+            <div class="empty-text">No users yet. Add Main or others.</div>
           </div>` :
             users.map(u => `
             <div class="item-row">
@@ -2974,7 +2974,7 @@
       </div>
 
       <div class="card" style="border-color:rgba(201,168,76,0.1)">
-        <div class="card-title">Permission Guide</div>
+        <div class="card-title">${icon('guide')}Permission Guide</div>
         ${ALL_PERMS.map(p => `
           <div style="padding:0.35rem 0;border-bottom:1px solid rgba(201,168,76,0.06);font-size:0.78rem">
             ${p.label}
@@ -3067,9 +3067,9 @@
     // Quick permission presets
     function applyPreset(preset) {
       const presets = {
-        saleOnly: ['sellSiam', 'viewStock'],
-        fullSales: ['sellSiam', 'sellTanjim', 'viewStock', 'viewHistory'],
-        manager: ['viewDashboard', 'sellSiam', 'sellTanjim', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts'],
+        saleOnly: ['sellMain', 'viewStock'],
+        fullSales: ['sellMain', 'sellTanjim', 'viewStock', 'viewHistory'],
+        manager: ['viewDashboard', 'sellMain', 'sellTanjim', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts'],
       };
       ALL_PERMS.forEach(p => {
         const el = document.getElementById(`perm-${p.key}`);
@@ -3314,6 +3314,40 @@
         if (r.ok) initApp();
         else logout();
       }).catch(() => logout());
+    }
+
+    // ═══════════════════════════════════════════════
+    //  SVG ICON LIBRARY — Minimal Line Style
+    // ═══════════════════════════════════════════════
+    const ICONS = {
+      // Nav icons
+      dashboard: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+      sale: `<svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
+      products: `<svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
+      history: `<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+      costs: `<svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+      users: `<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+      stock: `<svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>`,
+
+      // Section icons
+      customer: `<svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+      cart: `<svg viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>`,
+      tanjim: `<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+      bottle: `<svg viewBox="0 0 24 24"><path d="M9 2h6v4l2 3v11a2 2 0 01-2 2H9a2 2 0 01-2-2V9l2-3V2z"/><line x1="7" y1="13" x2="17" y2="13"/></svg>`,
+      summary: `<svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+      selling: `<svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
+      warning: `<svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+      download: `<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+      filter: `<svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`,
+      savings: `<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v6l4 2"/></svg>`,
+      market: `<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+      guide: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      topSell: `<svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+      recent: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    };
+
+    function icon(name, type = 'section') {
+      return `<span class="${type}-icon">${ICONS[name] || ICONS.guide}</span>`;
     }
   </script>
 </body>
