@@ -1113,9 +1113,15 @@
           <input class="form-input" type="number" id="cost-due" placeholder="0" />
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <input class="form-input" id="cost-notes" placeholder="Optional" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div class="form-group">
+          <label class="form-label">Date *</label>
+          <input class="form-input" type="date" id="cost-date" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="cost-notes" placeholder="Optional" />
+        </div>
       </div>
       <div style="display:flex;gap:0.5rem">
         <button class="btn btn-outline" style="flex:1" onclick="closeModal('cost-modal')">Cancel</button>
@@ -2518,8 +2524,22 @@
       el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
       try {
         const costs = await apiFetch('/api/costs');
-        const total = costs.reduce((s, c) => s + c.amount, 0);
-        const due = costs.reduce((s, c) => s + (c.dueAmount || 0), 0);
+
+        // Filter state
+        const fromVal = document.getElementById('cost-filter-from')?.value || '';
+        const toVal = document.getElementById('cost-filter-to')?.value || '';
+        const catVal = document.getElementById('cost-filter-cat')?.value || 'All';
+
+        let filtered = costs;
+        if (fromVal) filtered = filtered.filter(c => new Date(c.date) >= new Date(fromVal));
+        if (toVal) filtered = filtered.filter(c => new Date(c.date) <= new Date(toVal + 'T23:59:59'));
+        if (catVal !== 'All') filtered = filtered.filter(c => c.category === catVal);
+
+        const total = filtered.reduce((s, c) => s + c.amount, 0);
+        const due = filtered.reduce((s, c) => s + (c.dueAmount || 0), 0);
+
+        // Set today as default date for cost modal
+        const today = new Date().toISOString().split('T')[0];
 
         el.innerHTML = `
       <div class="stat-grid">
@@ -2532,15 +2552,45 @@
           <div class="stat-value danger">৳${due.toLocaleString()}</div>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm mb-2" onclick="openModal('cost-modal')">+ Record Cost</button>
+
+      <!-- Filter Bar -->
+      <div class="card" style="padding:0.75rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem">
+          <div>
+            <label class="form-label">From</label>
+            <input class="form-input" type="date" id="cost-filter-from" value="${fromVal}"
+              onchange="renderCosts()"/>
+          </div>
+          <div>
+            <label class="form-label">To</label>
+            <input class="form-input" type="date" id="cost-filter-to" value="${toVal}"
+              onchange="renderCosts()"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center">
+          ${['All', 'Raw', 'Packaging', 'Equipment', 'Food', 'Marketing', 'Other'].map(c => `
+            <button class="period-tab ${catVal === c ? 'active' : ''}" onclick="setCostCat('${c}')">${c}</button>
+          `).join('')}
+          <button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="clearCostFilters()">Clear</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="openCostModal()">+ Record Cost</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadData('excel')">📥 Excel</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadData('pdf')">📄 PDF</button>
+      </div>
+
       <div class="card">
-        ${costs.length === 0 ? `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">No costs recorded</div></div>` :
-            costs.map(c => `
+        ${filtered.length === 0
+            ? `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">No costs found</div></div>`
+            : filtered.map(c => `
             <div class="item-row">
               <div>
                 <div class="item-name">${c.name}</div>
                 <div class="item-meta">${c.category} · ${new Date(c.date).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
                 ${c.paidStatus !== 'Paid' ? `<span style="background:rgba(224,82,82,0.15);color:#e05252;font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px">${c.paidStatus} - ৳${c.dueAmount}</span>` : ''}
+                ${c.notes ? `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem">${c.notes}</div>` : ''}
               </div>
               <div style="display:flex;align-items:center;gap:0.5rem">
                 <span class="text-danger font-bold">৳${c.amount.toLocaleString()}</span>
@@ -2550,9 +2600,38 @@
           `).join('')}
       </div>
     `;
+
+        // Set default date on modal
+        setTimeout(() => {
+          const d = document.getElementById('cost-date');
+          if (d && !d.value) d.value = today;
+        }, 50);
+
       } catch (err) {
         showToast(err.message, 'error');
       }
+    }
+
+    // Cost filter helpers
+    let _costCat = 'All';
+    function setCostCat(cat) {
+      _costCat = cat;
+      const el = document.getElementById('cost-filter-cat');
+      if (el) el.value = cat;
+      renderCosts();
+    }
+    function clearCostFilters() {
+      const from = document.getElementById('cost-filter-from');
+      const to = document.getElementById('cost-filter-to');
+      if (from) from.value = '';
+      if (to) to.value = '';
+      _costCat = 'All';
+      renderCosts();
+    }
+    function openCostModal() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('cost-date').value = today;
+      openModal('cost-modal');
     }
 
     async function saveCost() {
@@ -2563,11 +2642,17 @@
         paidStatus: document.getElementById('cost-status').value,
         dueAmount: parseFloat(document.getElementById('cost-due').value) || 0,
         notes: document.getElementById('cost-notes').value,
+        date: document.getElementById('cost-date').value || new Date().toISOString(),
       };
       if (!body.name || !body.amount) return showToast('Name and amount required', 'error');
       try {
         await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(body) });
         showToast('Cost recorded ✓', 'success');
+        // Reset form
+        ['cost-name', 'cost-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('cost-amount').value = '';
+        document.getElementById('cost-due').value = '';
+        document.getElementById('cost-date').value = new Date().toISOString().split('T')[0];
         closeModal('cost-modal');
         renderCosts();
       } catch (err) {
@@ -2584,6 +2669,203 @@
       } catch (err) {
         showToast(err.message, 'error');
       }
+    }
+
+    // ═══════════════════════════════════════════════
+    //  DOWNLOAD — Excel + PDF
+    // ═══════════════════════════════════════════════
+    async function downloadData(format) {
+      showToast('Preparing download...', '');
+      try {
+        const [sales, costs, products] = await Promise.all([
+          apiFetch('/api/sales'),
+          apiFetch('/api/costs'),
+          apiFetch('/api/products'),
+        ]);
+
+        const totalRevenue = sales.reduce((s, x) => s + x.totalRevenue, 0);
+        const totalCosts = costs.reduce((s, x) => s + x.amount, 0);
+        const savings = totalRevenue - totalCosts;
+        const marketValue = products.reduce((s, p) =>
+          s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate), 0);
+
+        if (format === 'excel') {
+          downloadExcel(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
+        } else {
+          downloadPDF(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function downloadExcel(sales, costs, products, summary) {
+      // Build CSV content (opens in Excel)
+      const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+      const esc = v => `"${String(v || '').replace(/"/g, '""')}"`;
+
+      let csv = '';
+
+      // ── Summary Sheet ──
+      csv += 'NAFAS BUSINESS SUMMARY\n';
+      csv += `Generated,${fmtDate(new Date())}\n\n`;
+      csv += `Total Revenue,৳${summary.totalRevenue.toLocaleString()}\n`;
+      csv += `Total Costs,৳${summary.totalCosts.toLocaleString()}\n`;
+      csv += `Savings (In Hand),৳${summary.savings.toLocaleString()}\n`;
+      csv += `Inventory Market Value,৳${Math.round(summary.marketValue).toLocaleString()}\n\n`;
+
+      // ── Products ──
+      csv += '\nPRODUCTS\n';
+      csv += 'Name,Grade,Category,Stock,Unit,Purchase Rate/100ml,Selling Price/3.5ml,Market Value,Lot,Tanjim Stock\n';
+      products.forEach(p => {
+        const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+        csv += [esc(p.name), esc(p.grade || ''), esc(p.category), p.stock, p.unit,
+        p.purchaseRate, p.sellingPrice, Math.round(mv),
+        esc(p.lotInfo?.lotName || ''), p.tanjimStock || 0].join(',') + '\n';
+      });
+
+      // ── Sales ──
+      csv += '\nSALES HISTORY\n';
+      csv += 'Date,Customer,Items,Store,Channel,Revenue,Extra Costs,Net Profit,Sold By\n';
+      sales.forEach(s => {
+        const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(' + ');
+        const ec = (s.extraCosts?.packaging || 0) + (s.extraCosts?.delivery || 0) + (s.extraCosts?.others || 0);
+        csv += [fmtDate(s.date), esc(s.customerName), esc(items),
+        s.store || 'siam', s.channel, s.totalRevenue, ec,
+        s.netProfit || 0, s.soldBy].join(',') + '\n';
+      });
+
+      // ── Costs ──
+      csv += '\nCOSTS\n';
+      csv += 'Date,Name,Category,Amount,Status,Due Amount,Notes\n';
+      costs.forEach(c => {
+        csv += [fmtDate(c.date), esc(c.name), c.category, c.amount,
+        c.paidStatus, c.dueAmount || 0, esc(c.notes || '')].join(',') + '\n';
+      });
+
+      // Download
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `NAFAS_Report_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Excel file downloaded ✓', 'success');
+    }
+
+    function downloadPDF(sales, costs, products, summary) {
+      const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+      const today = fmtDate(new Date());
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<title>NAFAS Report</title>
+<style>
+  body { font-family: Arial, sans-serif; color: #1a1a1a; padding: 30px; font-size: 12px; }
+  h1 { color: #c9a84c; font-size: 24px; margin: 0; letter-spacing: 3px; }
+  h2 { color: #c9a84c; font-size: 13px; letter-spacing: 2px; border-bottom: 1px solid #c9a84c; padding-bottom: 4px; margin-top: 24px; }
+  .meta { color: #666; font-size: 11px; margin-bottom: 24px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 8px; }
+  .summary-card { background: #faf7f0; border: 1px solid #e8d8a0; border-radius: 8px; padding: 12px; text-align: center; }
+  .summary-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .summary-value { font-size: 18px; font-weight: bold; color: #c9a84c; margin-top: 4px; }
+  .savings .summary-value { color: #2a9d5c; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }
+  th { background: #f5edda; color: #8a6a1a; text-align: left; padding: 6px 8px; font-size: 10px; letter-spacing: 0.5px; }
+  td { padding: 5px 8px; border-bottom: 1px solid #f0e8d0; }
+  tr:hover td { background: #fdf9f0; }
+  .tag { background: #f5edda; color: #8a6a1a; padding: 1px 6px; border-radius: 10px; font-size: 10px; }
+  .danger { color: #e05252; font-weight: bold; }
+  .success { color: #2a9d5c; font-weight: bold; }
+  .gold { color: #c9a84c; font-weight: bold; }
+  @media print { body { padding: 15px; } }
+</style>
+</head>
+<body>
+
+<h1>NAFAS</h1>
+<div class="meta">Business Report · Generated ${today}</div>
+
+<h2>SUMMARY</h2>
+<div class="summary-grid">
+  <div class="summary-card">
+    <div class="summary-label">Total Revenue</div>
+    <div class="summary-value">৳${summary.totalRevenue.toLocaleString()}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Total Costs</div>
+    <div class="summary-value" style="color:#e05252">৳${summary.totalCosts.toLocaleString()}</div>
+  </div>
+  <div class="summary-card savings">
+    <div class="summary-label">In Hand (Savings)</div>
+    <div class="summary-value">৳${summary.savings.toLocaleString()}</div>
+  </div>
+  <div class="summary-card">
+    <div class="summary-label">Market Value</div>
+    <div class="summary-value">৳${Math.round(summary.marketValue).toLocaleString()}</div>
+  </div>
+</div>
+
+<h2>PRODUCTS (${products.length})</h2>
+<table>
+  <tr><th>Name</th><th>Grade</th><th>Stock</th><th>Buy/100ml</th><th>Sell/3.5ml</th><th>Market Value</th><th>Tanjim</th><th>Lot</th></tr>
+  ${products.map(p => {
+        const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+        return `<tr>
+      <td>${p.name}</td>
+      <td>${p.grade || '—'}</td>
+      <td class="${p.stock <= p.lowStockAlert ? 'danger' : ''}"><b>${p.stock}</b>${p.unit}</td>
+      <td>৳${p.purchaseRate}</td>
+      <td>৳${p.sellingPrice}</td>
+      <td class="gold">৳${Math.round(mv).toLocaleString()}</td>
+      <td>${p.tanjimStock || 0}${p.unit}</td>
+      <td><span class="tag">${p.lotInfo?.lotName || '—'}</span></td>
+    </tr>`;
+      }).join('')}
+</table>
+
+<h2>SALES HISTORY (${sales.length} sales)</h2>
+<table>
+  <tr><th>Date</th><th>Customer</th><th>Items</th><th>Store</th><th>Revenue</th><th>Net Profit</th><th>By</th></tr>
+  ${sales.map(s => {
+        const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(', ');
+        return `<tr>
+      <td>${fmtDate(s.date)}</td>
+      <td>${s.customerName}</td>
+      <td style="max-width:180px">${items}</td>
+      <td><span class="tag">${s.store || 'siam'}</span></td>
+      <td class="gold">৳${s.totalRevenue}</td>
+      <td class="success">৳${s.netProfit || 0}</td>
+      <td>${s.soldBy}</td>
+    </tr>`;
+      }).join('')}
+</table>
+
+<h2>COSTS (${costs.length} entries)</h2>
+<table>
+  <tr><th>Date</th><th>Name</th><th>Category</th><th>Amount</th><th>Status</th><th>Due</th><th>Notes</th></tr>
+  ${costs.map(c => `<tr>
+    <td>${fmtDate(c.date)}</td>
+    <td>${c.name}</td>
+    <td><span class="tag">${c.category}</span></td>
+    <td class="danger">৳${c.amount.toLocaleString()}</td>
+    <td>${c.paidStatus}</td>
+    <td>${c.dueAmount || 0}</td>
+    <td style="color:#888">${c.notes || ''}</td>
+  </tr>`).join('')}
+</table>
+
+</body>
+</html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 600);
+      showToast('PDF ready — use Print → Save as PDF ✓', 'success');
     }
 
     // ═══════════════════════════════════════════════
