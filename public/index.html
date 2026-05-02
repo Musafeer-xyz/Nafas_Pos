@@ -11,20 +11,340 @@
     rel="stylesheet">
   <style>
     :root {
-      --gold: #c9a84c;
-      --gold-light: #e8c97a;
-      --gold-dim: rgba(201, 168, 76, 0.15);
-      --dark: #0d0b08;
-      --dark-2: #141209;
-      --dark-3: #1e1a12;
-      --dark-4: #2a2418;
-      --text: #e8e0d0;
-      --text-muted: #8a7f6e;
-      --danger: #e05252;
-      --success: #52c07a;
-      --card: rgba(30, 26, 18, 0.95);
-      --border: rgba(201, 168, 76, 0.2);
+      --gold: #000000;
+      --gold-light: #333333;
+      --gold-dim: rgba(0, 0, 0, 0.06);
+      --dark: #F2F2F7;
+      --dark-2: #FFFFFF;
+      --dark-3: #F2F2F7;
+      --dark-4: #E5E5EA;
+      --text: #1C1C1E;
+      --text-muted: #6C6C70;
+      --danger: #FF3B30;
+      --success: #34C759;
+      --card: #FFFFFF;
+      --border: #E5E5EA;
       --radius: 12px;
+    }
+
+    /* ── Light Theme Overrides ── */
+    body {
+      background: #F2F2F7;
+    }
+
+    #login-screen {
+      background: radial-gradient(ellipse at 50% 0%, rgba(0, 0, 0, 0.04) 0%, transparent 70%), #F2F2F7;
+    }
+
+    .brand-logo {
+      color: #1C1C1E;
+    }
+
+    .brand-sub {
+      color: #6C6C70;
+    }
+
+    .pin-dot {
+      border-color: #1C1C1E;
+    }
+
+    .pin-dot.filled {
+      background: #1C1C1E;
+    }
+
+    .num-btn {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .num-btn.clear {
+      color: #FF3B30;
+    }
+
+    .num-btn.enter {
+      background: #1C1C1E;
+      color: #FFFFFF;
+    }
+
+    .topbar {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid #E5E5EA;
+    }
+
+    .topbar-brand {
+      color: #1C1C1E;
+    }
+
+    .bottom-nav {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid #E5E5EA;
+    }
+
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .card-title {
+      color: #1C1C1E;
+    }
+
+    .stat-card {
+      background: #F2F2F7;
+      border: 1px solid #E5E5EA;
+    }
+
+    .stat-value {
+      color: #1C1C1E;
+    }
+
+    .stat-value.success {
+      color: #34C759;
+    }
+
+    .stat-value.danger {
+      color: #FF3B30;
+    }
+
+    .form-input,
+    .form-select {
+      background: #F2F2F7;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      border-color: #1C1C1E;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .form-label {
+      color: #6C6C70;
+    }
+
+    .btn-primary {
+      background: #1C1C1E;
+      color: #FFFFFF;
+    }
+
+    .btn-primary:active {
+      background: #3A3A3C;
+    }
+
+    .btn-outline {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+    }
+
+    .btn-outline:hover {
+      border-color: #1C1C1E;
+      color: #1C1C1E;
+    }
+
+    .btn-danger {
+      background: rgba(255, 59, 48, 0.08);
+      color: #FF3B30;
+      border: 1px solid rgba(255, 59, 48, 0.2);
+    }
+
+    .btn-success {
+      background: rgba(52, 199, 89, 0.08);
+      color: #34C759;
+      border: 1px solid rgba(52, 199, 89, 0.2);
+    }
+
+    .period-tab {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      color: #6C6C70;
+    }
+
+    .period-tab.active {
+      background: #1C1C1E;
+      color: #FFFFFF;
+      border-color: #1C1C1E;
+    }
+
+    .modal {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-handle {
+      background: #E5E5EA;
+    }
+
+    .modal-title {
+      color: #1C1C1E;
+    }
+
+    .modal-overlay {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .item-name {
+      color: #1C1C1E;
+    }
+
+    .item-meta {
+      color: #6C6C70;
+    }
+
+    .item-stock {
+      font-weight: 600;
+    }
+
+    .stock-ok {
+      color: #34C759;
+    }
+
+    .stock-low {
+      color: #FF3B30;
+    }
+
+    .grade-badge {
+      background: rgba(0, 0, 0, 0.06);
+      color: #1C1C1E;
+    }
+
+    .combo-badge {
+      background: rgba(52, 199, 89, 0.1);
+      color: #34C759;
+    }
+
+    .sale-customer {
+      color: #1C1C1E;
+    }
+
+    .sale-amount {
+      color: #1C1C1E;
+      font-weight: 700;
+    }
+
+    .sale-date {
+      color: #6C6C70;
+    }
+
+    .sale-channel {
+      background: #F2F2F7;
+      color: #6C6C70;
+    }
+
+    .alert-banner {
+      background: rgba(255, 59, 48, 0.06);
+      border: 1px solid rgba(255, 59, 48, 0.2);
+      color: #FF3B30;
+    }
+
+    .section-title {
+      color: #6C6C70;
+    }
+
+    .empty-state {
+      color: #6C6C70;
+    }
+
+    /* Savings banner */
+    .savings-banner {
+      background: linear-gradient(135deg, #F2F2F7, #FFFFFF);
+      border: 1px solid #E5E5EA;
+    }
+
+    /* Icon colors for light theme */
+    .nav-icon svg {
+      stroke: #6C6C70 !important;
+      fill: none !important;
+    }
+
+    .nav-item.active .nav-icon svg {
+      stroke: #1C1C1E !important;
+      fill: none !important;
+    }
+
+    .section-icon svg {
+      stroke: #1C1C1E !important;
+      fill: none !important;
+      opacity: 0.7;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #E5E5EA;
+      border-radius: 2px;
+    }
+
+    /* Toast */
+    #toast {
+      background: #1C1C1E;
+      border: none;
+      color: #FFFFFF;
+    }
+
+    #toast.success {
+      background: #34C759;
+      color: #FFFFFF;
+    }
+
+    #toast.error {
+      background: #FF3B30;
+      color: #FFFFFF;
+    }
+
+    /* Search input */
+    .search-input {
+      background: #F2F2F7;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+    }
+
+    .search-icon {
+      color: #6C6C70;
+    }
+
+    /* Qty buttons */
+    .qty-btn {
+      background: #F2F2F7;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+    }
+
+    .qty-val {
+      background: #FFFFFF;
+      border: 1px solid #E5E5EA;
+      color: #1C1C1E;
+    }
+
+    /* Cart */
+    .cart-item-name {
+      color: #1C1C1E;
+    }
+
+    .cart-item-price {
+      color: #1C1C1E;
+      font-weight: 700;
+    }
+
+    /* Divider */
+    .divider {
+      border-color: #E5E5EA;
     }
 
     * {
