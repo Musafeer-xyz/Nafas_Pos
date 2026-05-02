@@ -215,21 +215,22 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 0.65rem 0.5rem;
+      padding: 0.5rem 0.25rem;
       cursor: pointer;
       border: none;
       background: none;
       color: var(--text-muted);
-      font-size: 0.65rem;
-      letter-spacing: 0.05em;
+      font-size: 0.55rem;
+      letter-spacing: 0.03em;
       text-transform: uppercase;
       font-family: 'DM Sans', sans-serif;
       transition: color 0.15s;
-      gap: 0.25rem;
+      gap: 0.2rem;
+      min-width: 0;
     }
 
     .nav-item .icon {
-      font-size: 1.3rem;
+      font-size: 1.1rem;
       line-height: 1;
     }
 
@@ -1163,13 +1164,51 @@
       <!-- Permissions -->
       <div class="form-label" style="margin-bottom:0.5rem">Permissions</div>
       <div style="display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
-        ${ALL_PERMS.map(p => `
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-          <input type="checkbox" id="perm-${p.key}" style="width:16px;height:16px;accent-color:var(--gold)" />
-          <span style="font-size:0.82rem">${p.label}</span>
+          <input type="checkbox" id="perm-viewDashboard" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">📊 View Dashboard & Revenue</span>
         </label>
-        `).join('')}
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-viewStock" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">📦 View Stock</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-viewHistory" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🧾 View Sale History</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-sellSiam" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🏪 Record Sales (Siam Store)</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-sellTanjim" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🤝 Record Sales (Tanjim Store)</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-addProducts" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">➕ Add / Edit Products</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-manageCosts" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">💸 Manage Costs</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-giveStockTanjim" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🔄 Give Stock to Tanjim</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-deleteSales" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">🗑 Delete Sales</span>
+        </label>
       </div>
 
       <div style="display:flex;gap:0.5rem">
@@ -1732,32 +1771,53 @@
         return;
       }
 
-      el.innerHTML = cart.map((item, idx) => `
+      el.innerHTML = cart.map((item, idx) => {
+        // totalPrice = perMlPrice × qty (for products), or unitPrice flat (for combos)
+        const totalPrice = (item.perMlPrice && item.itemType === 'Product')
+          ? item.perMlPrice * item.qty
+          : item.unitPrice;
+        const pricePerUnit = item.perMlPrice
+          ? (item.perMlPrice * item.qty).toFixed(0)
+          : item.unitPrice.toFixed(0);
+        return `
     <div class="cart-item">
-      <div>
+      <div style="flex:1">
         <div class="cart-item-name">
           ${item.name}
           ${item.itemType === 'Combo' ? '<span class="combo-badge">COMBO</span>' : ''}
           ${item.isOverridden ? '<span style="background:rgba(224,82,82,0.15);color:#e05252;font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">CUSTOM PRICE</span>' : ''}
         </div>
-        <div class="cart-item-meta">
-          ${item.qty} × ৳${item.unitPrice} 
-          ${item.isOverridden ? `<span class="text-muted">(orig ৳${item.originalPrice})</span>` : ''}
+        <div class="cart-item-meta" style="display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;flex-wrap:wrap">
+          <button class="qty-btn" onclick="changeCartQty(${idx}, -3.5)">−</button>
+          <span class="qty-val">${item.qty}ml</span>
+          <button class="qty-btn" onclick="changeCartQty(${idx}, 3.5)">+</button>
+          <input class="form-input" type="number" step="0.5" min="0.5"
+            style="width:60px;padding:0.25rem 0.4rem;font-size:0.8rem"
+            value="${item.qty}"
+            onchange="setCartQty(${idx}, this.value)"/>
+          <span style="font-size:0.7rem;color:var(--text-muted)">
+            ৳${item.perMlPrice ? item.perMlPrice.toFixed(1) : item.unitPrice}/ml
+          </span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:0.5rem">
-        <span class="cart-item-price">৳${(item.qty * item.unitPrice).toFixed(0)}</span>
+      <div style="display:flex;align-items:center;gap:0.4rem;margin-left:0.5rem">
+        <span class="cart-item-price">৳${Math.round(totalPrice)}</span>
         <button class="icon-btn" onclick="openOverride(${idx})" title="Override price">✏️</button>
         <button class="icon-btn" onclick="removeCartItem(${idx})" title="Remove">✕</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+      }).join('');
 
       updateCartTotal();
     }
 
     function updateCartTotal() {
-      const total = cart.reduce((s, i) => s + (i.qty * i.unitPrice), 0);
+      const total = cart.reduce((s, i) => {
+        const lineTotal = (i.perMlPrice && i.itemType === 'Product')
+          ? i.perMlPrice * i.qty
+          : i.unitPrice;
+        return s + lineTotal;
+      }, 0);
       const pkg = parseFloat(document.getElementById('ec-packaging')?.value || 0);
       const del = parseFloat(document.getElementById('ec-delivery')?.value || 0);
       const oth = parseFloat(document.getElementById('ec-others')?.value || 0);
@@ -1915,7 +1975,9 @@
           itemId: i.itemId,
           itemType: i.itemType,
           qty: parseFloat(i.qty),
-          overridePrice: i.isOverridden ? i.unitPrice : undefined
+          overridePrice: (i.perMlPrice && i.itemType === 'Product')
+            ? parseFloat((i.perMlPrice * i.qty).toFixed(2))  // total price for this qty
+            : (i.isOverridden ? i.unitPrice : undefined)
         })),
         extraCosts: {
           packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
