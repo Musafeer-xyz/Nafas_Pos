@@ -1982,7 +1982,7 @@
     // ═══════════════════════════════════════════════
     //  SALE ENTRY
     // ═══════════════════════════════════════════════
-    let activeSaleStore = 'Main'; // 'Main' or 'tanjim'
+    let activeSaleStore = 'siam'; // 'Main' or 'tanjim'
 
     function renderSaleEntry() {
       const el = document.getElementById('main-content');
@@ -1990,7 +1990,7 @@
     <!-- STORE SELECTOR -->
     <div style="display:grid;grid-template-columns:${can('sellMain') && can('sellTanjim') ? '1fr 1fr' : '1fr'};gap:0.5rem;margin-bottom:0.75rem">
       ${can('sellMain') ? `
-      <button id="store-Main-btn" onclick="setSaleStore('Main')"
+      <button id="store-Main-btn" onclick="setSaleStore('siam')"
         style="padding:0.85rem;border-radius:var(--radius);border:2px solid ${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--border)'};
         background:${activeSaleStore === 'Main' ? 'var(--gold-dim)' : 'var(--dark-3)'};
         color:${activeSaleStore === 'Main' ? 'var(--gold)' : 'var(--text-muted)'};
