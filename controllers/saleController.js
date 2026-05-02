@@ -2,7 +2,7 @@ const Sale = require('../models/Sale');
 const Product = require('../models/Product');
 const Combo = require('../models/Combo');
 const mongoose = require('mongoose');
-const { customerName, customerPhone, items, extraCosts, channel, notes, store, date } = req.body;
+
 
 // POST: Record a new sale (handles products + combos, deducts stock)
 exports.create = async (req, res) => {
@@ -10,7 +10,7 @@ exports.create = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { customerName, customerPhone, items, extraCosts, channel, notes, store } = req.body;
+    const { customerName, customerPhone, items, extraCosts, channel, notes, store, date } = req.body;
     const soldBy = req.user.role === 'admin' ? 'Admin' : 'Assistant';
     const isTanjim = store === 'tanjim';
 
