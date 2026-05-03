@@ -1,21 +1,27 @@
 const mongoose = require('mongoose');
 
+const branchStockSchema = new mongoose.Schema({
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
+  qty: { type: Number, default: 0 }
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   category: { type: String, enum: ['Attar', 'Apparel', 'Gadget'], default: 'Attar' },
   grade: { type: String, enum: ['A', 'B', 'C', ''], default: '' },
-  stock: { type: Number, default: 0 },       // ml for Attar, pieces for others
+  stock: { type: Number, default: 0 },
   purchaseRate: { type: Number, required: true },
   sellingPrice: { type: Number, required: true },
-  unit: { type: String, default: 'ml' },     // 'ml' or 'piece'
+  unit: { type: String, default: 'ml' },
   lowStockAlert: { type: Number, default: 10 },
   lotInfo: {
-    lotName: String,      // e.g. "1st LOT", "2nd LOT"
+    lotName: String,
     purchaseDate: Date,
-    perMLCost: Number,    // calculated cost per ml
+    perMLCost: Number,
   },
   notes: { type: String, default: '' },
-  tanjimStock: { type: Number, default: 0 },
+  tanjimStock: { type: Number, default: 0 }, // kept for migration
+  branchStock: [branchStockSchema],           // dynamic branch stock
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
