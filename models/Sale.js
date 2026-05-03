@@ -28,11 +28,13 @@ const saleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto-calculate netProfit before save
-saleSchema.pre('save', function(next) {
+saleSchema.pre('save', function (next) {
   const costs = this.extraCosts;
   const totalCosts = (costs.packaging || 0) + (costs.delivery || 0) + (costs.others || 0);
   this.netProfit = this.totalRevenue - totalCosts;
   next();
 });
+
+module.exports = mongoose.model('Sale', saleSchema);
 
 module.exports = mongoose.model('Sale', saleSchema);
