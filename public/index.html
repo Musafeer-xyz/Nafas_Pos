@@ -296,10 +296,6 @@
       position: fixed;
       bottom: 100px;
       left: 50%;
-      /* translateX এর সাথে translateZ(0) দিলে এটা GPU-তে প্রসেস হবে, ল্যাগ করবে না */
-      transform: translateX(-50%) translateZ(0);
-      /* নিচের লাইনটা টেক্সট রেন্ডারিং গ্লিচ সলভ করে */
-      backface-visibility: hidden;
       transform: translateX(-50%);
       border-radius: 10px;
       padding: 0.75rem 1.5rem;
@@ -307,12 +303,12 @@
       font-weight: 600;
       z-index: 9999;
       opacity: 0;
-      transition: opacity 0.25s;
+      transition: opacity 0.3s ease;
       white-space: nowrap;
       pointer-events: none;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
       background: #1C1C1E;
-      color: #FFFFFF;
+      color: #FFFFFF !important;
       border: none;
     }
 
@@ -321,13 +317,13 @@
     }
 
     #toast.success {
-      background: #34C759;
-      color: #FFFFFF;
+      background: #34C759 !important;
+      color: #FFFFFF !important;
     }
 
     #toast.error {
-      background: #FF3B30;
-      color: #FFFFFF;
+      background: #FF3B30 !important;
+      color: #FFFFFF !important;
     }
 
     /* Search input */
@@ -3299,27 +3295,16 @@
     });
 
     let toastTimer;
-
     function showToast(msg, type = '') {
       const t = document.getElementById('toast');
-
-      // ১. যদি আগে থেকে ওপেন থাকে, সেটা রিমুভ করো
-      t.classList.remove('show');
-
-      // ২. নতুন টেক্সট এবং কালারের ক্লাস (success/error) বসাও
+      t.classList.remove('show', 'success', 'error');
       t.textContent = msg;
-      t.className = type;
-
-      // ৩. ম্যাজিক লাইন (Force Reflow): এটা ব্রাউজারকে বাধ্য করবে অ্যানিমেশনের আগেই টেক্সট রেডি করতে
-      void t.offsetWidth;
-
-      // ৪. এবার show ক্লাস অ্যাড করে অ্যানিমেশন শুরু করো
+      void t.offsetWidth; // force reflow
+      if (type) t.classList.add(type);
       t.classList.add('show');
-
-      // ৫. টাইমার সেট করো
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
-        t.classList.remove('show');
+        t.classList.remove('show', 'success', 'error');
       }, 2500);
     }
 
