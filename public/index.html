@@ -1866,10 +1866,6 @@
           apiFetch('/api/products'),
           apiFetch('/api/dashboard/stats?period=all')  // always all time for savings
         ]);
-        const [data, products] = await Promise.all([
-          apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
-          apiFetch('/api/products')
-        ]);
         if (!data) return;
 
         // Market value: stock * (purchaseRate/100) for ml-based products
