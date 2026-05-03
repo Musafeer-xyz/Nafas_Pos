@@ -1,40 +1,22 @@
 const mongoose = require('mongoose');
 
-const saleSchema = new mongoose.Schema({
-    customerName: { type: String, default: 'Walk-in' },
-    customerPhone: { type: String, default: '' },
-    items: [{
-        itemId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        itemType: { type: String, enum: ['Product', 'Combo'], required: true },
-        name: { type: String },          // snapshot name
-        qty: { type: Number, required: true },
-        unitPrice: { type: Number, required: true },  // actual sold price (may be overridden)
-        originalPrice: { type: Number }, // original DB price for reference
-        isOverridden: { type: Boolean, default: false }
-    }],
-    totalRevenue: { type: Number, required: true },
-    extraCosts: {
-        packaging: { type: Number, default: 0 },
-        delivery: { type: Number, default: 0 },
-        others: { type: Number, default: 0 },
-        otherNote: { type: String, default: '' }
-    },
-    netProfit: { type: Number }, // calculated: totalRevenue - extraCosts
-    soldBy: { type: String, default: 'Admin' },
-    store: { type: String, enum: ['siam', 'tanjim', 'main', 'branch'], default: 'main' },
-    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
-    branchName: { type: String, default: '' },
-    channel: { type: String, enum: ['Direct', 'Facebook', 'WhatsApp', 'Other'], default: 'Direct' },
-    notes: { type: String, default: '' },
-    date: { type: Date, default: Date.now }
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    pin: { type: String, required: true },
+    role: { type: String, default: 'custom' },
+    isActive: { type: Boolean, default: true },
+    assignedBranch: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
+    permissions: {
+        viewDashboard: { type: Boolean, default: false },
+        viewStock: { type: Boolean, default: true },
+        viewHistory: { type: Boolean, default: false },
+        sellMain: { type: Boolean, default: false },
+        sellBranch: { type: Boolean, default: true },
+        addProducts: { type: Boolean, default: false },
+        manageCosts: { type: Boolean, default: false },
+        transferStock: { type: Boolean, default: false },
+        deleteSales: { type: Boolean, default: false },
+    }
 }, { timestamps: true });
-
-// Auto-calculate netProfit before save
-saleSchema.pre('save', function (next) {
-    const costs = this.extraCosts;
-    const totalCosts = (costs.packaging || 0) + (costs.delivery || 0) + (costs.others || 0);
-    this.netProfit = this.totalRevenue - totalCosts;
-    next();
-});
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
