@@ -1627,92 +1627,207 @@
         </div>
       </div>
 
-      // ═══════════════════════════════════════════════
-      // BRANCH MANAGEMENT
-      // ═══════════════════════════════════════════════
-      function openBranchModal() {
-      document.getElementById('branch-name').value = '';
-      document.getElementById('branch-location').value = '';
-      document.getElementById('branch-notes').value = '';
-      openModal('branch-modal');
-      }
 
-      async function saveBranch() {
-      const name = document.getElementById('branch-name').value.trim();
-      if (!name) return showToast('Branch name required', 'error');
-      try {
-      await apiFetch('/api/branches', {
-      method: 'POST',
-      body: JSON.stringify({
-      name,
-      location: document.getElementById('branch-location').value,
-      notes: document.getElementById('branch-notes').value
-      })
-      });
-      allBranches = await apiFetch('/api/branches') || [];
-      showToast(`✓ ${name} branch created`, 'success');
-      closeModal('branch-modal');
-      renderUsers();
-      } catch(err) {
-      showToast(err.message, 'error');
-      }
-      }
 
-      async function deleteBranch(id, name) {
-      if (!confirm(`Delete "${name}" branch? All its stock will return to Main Store.`)) return;
-      try {
-      await apiFetch(`/api/branches/${id}`, { method: 'DELETE' });
-      allBranches = await apiFetch('/api/branches') || [];
-      showToast(`${name} deleted, stock returned to main`, 'success');
-      renderUsers();
-      } catch(err) {
-      showToast(err.message, 'error');
-      }
-      }
+      <!-- ═══ BULK IMPORT MODAL ═══ -->
+      <div class="modal-overlay" id="import-modal">
+        <div class="modal" style="border-radius:20px 20px 0 0; max-height:92vh">
+          <div class="modal-handle"></div>
+          <div class="modal-title">📥 Bulk Import Data</div>
 
-      // ─── Stock Transfer ───
-      let transferDir = 'give';
-      let transferBranchId = null;
+          <!-- Tab selector -->
+          <div style="display:flex;gap:0.4rem;margin-bottom:1rem">
+            <button class="period-tab active" id="imp-tab-products"
+              onclick="switchImportTab('products')">Products</button>
+            <button class="period-tab" id="imp-tab-sales" onclick="switchImportTab('sales')">Past Sales</button>
+            <button class="period-tab" id="imp-tab-costs" onclick="switchImportTab('costs')">Costs</button>
+          </div>
 
-      function setTransferDir(dir) {
-      transferDir = dir;
-      document.getElementById('transfer-give-tab').classList.toggle('active', dir === 'give');
-      document.getElementById('transfer-return-tab').classList.toggle('active', dir === 'return');
-      loadTransferProducts();
-      }
+          <!-- PRODUCTS TAB -->
+          <div id="imp-products-panel">
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+              Paste one product per line in this format:<br>
+              <code
+                style="color:var(--gold);font-size:0.72rem">Name, Grade, Stock(ml), PurchaseRate, SellingPrice, LotName</code><br>
+              <span style="color:var(--text-muted);font-size:0.7rem">Example: Ehsas Al Arabia, A, 435, 1450, 220, 2nd
+                LOT</span>
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
+              <div>
+                <label class="form-label">Category</label>
+                <select class="form-select" id="imp-category">
+                  <option value="Attar">Attar</option>
+                  <option value="Apparel">Apparel</option>
+                  <option value="Gadget">Gadget</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Unit</label>
+                <select class="form-select" id="imp-unit">
+                  <option value="ml">ml</option>
+                  <option value="piece">piece</option>
+                </select>
+              </div>
+            </div>
+            <textarea id="imp-products-text" class="form-input" rows="8"
+              placeholder="Ehsas Al Arabia, A, 435, 1450, 220, 2nd LOT&#10;Dior Sauvage, A, 270, 900, 180, 1st LOT&#10;Cool Water, B, 180, 600, 120, 1st LOT&#10;Versace, A, 600, 2000, 300, 1st LOT"
+              style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+            <div id="imp-products-preview" style="margin-top:0.5rem"></div>
+          </div>
 
-      async function openTransferModal(branchId, branchName) {
-      transferBranchId = branchId;
-      transferDir = 'give';
-      document.getElementById('transfer-branch-id').value = branchId;
-      document.getElementById('transfer-modal-title').textContent = `Transfer Stock — ${branchName}`;
-      document.getElementById('transfer-give-tab').classList.add('active');
-      document.getElementById('transfer-return-tab').classList.remove('active');
-      openModal('transfer-modal');
-      await loadTransferProducts();
-      }
+          <!-- SALES TAB -->
+          <div id="imp-sales-panel" style="display:none">
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+              Paste past sales. Each sale = one line:<br>
+              <code
+                style="color:var(--gold);font-size:0.72rem">CustomerName, ProductName, Qty(ml), Amount, Date(DD-Mon-YYYY)</code><br>
+              <span style="color:var(--text-muted);font-size:0.7rem">Example: Apu, Versace, 3.5, 200,
+                10-Dec-2025</span><br>
+              <span style="color:var(--text-muted);font-size:0.7rem">⚠️ Past sales won't deduct current stock
+                (historical
+                only)</span>
+            </p>
+            <textarea id="imp-sales-text" class="form-input" rows="8"
+              placeholder="Apu, Versace, 3.5, 200, 10-Dec-2025&#10;Apu, Al Bakhoor, 3.5, 200, 10-Dec-2025&#10;Mawa, Dunhill Desire, 3.5, 500, 11-Dec-2025&#10;Jonayed, Dior Sauvage, 6, 310, 13-Dec-2025"
+              style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+            <div id="imp-sales-preview" style="margin-top:0.5rem"></div>
+          </div>
 
-      async function loadTransferProducts() {
-      const container = document.getElementById('transfer-product-list');
-      container.innerHTML = '<div class="loading-center">
-        <div class="spinner"></div>
-      </div>';
-      try {
-      const products = await apiFetch('/api/products');
-      const attars = products.filter(p => p.category === 'Attar' && p.isActive !== false);
+          <!-- COSTS TAB -->
+          <div id="imp-costs-panel" style="display:none">
+            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
+              Paste one cost per line:<br>
+              <code style="color:var(--gold);font-size:0.72rem">Name, Amount, Category, Status</code><br>
+              <span style="color:var(--text-muted);font-size:0.7rem">Categories: Raw, Packaging, Equipment, Food,
+                Marketing,
+                Other</span><br>
+              <span style="color:var(--text-muted);font-size:0.7rem">Status: Paid, Due, Partial</span>
+            </p>
+            <textarea id="imp-costs-text" class="form-input" rows="8"
+              placeholder="Printer, 6000, Equipment, Paid&#10;Raw material, 5777, Raw, Partial&#10;Sticker Paper, 50, Packaging, Paid&#10;Bottle 3.5x5dzn, 900, Packaging, Paid&#10;Lunch, 760, Food, Paid"
+              style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
+            <div id="imp-costs-preview" style="margin-top:0.5rem"></div>
+          </div>
 
-      container.innerHTML = attars.map((p, i) => {
-      const branchEntry = (p.branchStock || []).find(b => b.branchId === transferBranchId);
-      const branchQty = branchEntry ? branchEntry.qty : 0;
-      const available = transferDir === 'give' ? p.stock : branchQty;
-      return `
+          <!-- Progress bar (hidden by default) -->
+          <div id="imp-progress-wrap" style="display:none;margin-top:0.75rem">
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.3rem">
+              <span id="imp-progress-label" style="color:var(--text-muted)">Importing...</span>
+              <span id="imp-progress-count" style="color:var(--gold)"></span>
+            </div>
+            <div style="background:var(--dark-4);border-radius:4px;height:6px;overflow:hidden">
+              <div id="imp-progress-bar"
+                style="height:100%;background:var(--gold);width:0%;transition:width 0.2s;border-radius:4px"></div>
+            </div>
+          </div>
+
+          <!-- Result summary -->
+          <div id="imp-result"
+            style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:8px;font-size:0.82rem">
+          </div>
+
+          <div style="display:flex;gap:0.5rem;margin-top:1rem">
+            <button class="btn btn-outline" style="flex:1" onclick="closeModal('import-modal')">Close</button>
+            <button class="btn btn-primary" style="flex:1" id="imp-submit-btn" onclick="runImport()">Import
+              Now</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast"></div>
+
+      <script>
+        // ═══════════════════════════════════════════════
+        //  CONFIG & STATE
+        // ═══════════════════════════════════════════════
+
+        // ═══════════════════════════════════════════════
+        // BRANCH MANAGEMENT
+        // ═══════════════════════════════════════════════
+        function openBranchModal() {
+          document.getElementById('branch-name').value = '';
+          document.getElementById('branch-location').value = '';
+          document.getElementById('branch-notes').value = '';
+          openModal('branch-modal');
+        }
+
+        async function saveBranch() {
+          const name = document.getElementById('branch-name').value.trim();
+          if (!name) return showToast('Branch name required', 'error');
+          try {
+            await apiFetch('/api/branches', {
+              method: 'POST',
+              body: JSON.stringify({
+                name,
+                location: document.getElementById('branch-location').value,
+                notes: document.getElementById('branch-notes').value
+              })
+            });
+            allBranches = await apiFetch('/api/branches') || [];
+            showToast(`✓ ${name} branch created`, 'success');
+            closeModal('branch-modal');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        async function deleteBranch(id, name) {
+          if (!confirm(`Delete "${name}" branch? All its stock will return to Main Store.`)) return;
+          try {
+            await apiFetch(`/api/branches/${id}`, { method: 'DELETE' });
+            allBranches = await apiFetch('/api/branches') || [];
+            showToast(`${name} deleted, stock returned to main`, 'success');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        // ─── Stock Transfer ───
+        let transferDir = 'give';
+        let transferBranchId = null;
+
+        function setTransferDir(dir) {
+          transferDir = dir;
+          document.getElementById('transfer-give-tab').classList.toggle('active', dir === 'give');
+          document.getElementById('transfer-return-tab').classList.toggle('active', dir === 'return');
+          loadTransferProducts();
+        }
+
+        async function openTransferModal(branchId, branchName) {
+          transferBranchId = branchId;
+          transferDir = 'give';
+          document.getElementById('transfer-branch-id').value = branchId;
+          document.getElementById('transfer-modal-title').textContent = `Transfer Stock — ${branchName}`;
+          document.getElementById('transfer-give-tab').classList.add('active');
+          document.getElementById('transfer-return-tab').classList.remove('active');
+          openModal('transfer-modal');
+          await loadTransferProducts();
+        }
+
+        async function loadTransferProducts() {
+          const container = document.getElementById('transfer-product-list');
+          container.innerHTML = '<div class="loading-center">
+            < div class="spinner" ></div >
+      </div > ';
+          try {
+            const products = await apiFetch('/api/products');
+            const attars = products.filter(p => p.category === 'Attar' && p.isActive !== false);
+
+            container.innerHTML = attars.map((p, i) => {
+              const branchEntry = (p.branchStock || []).find(b => b.branchId === transferBranchId);
+              const branchQty = branchEntry ? branchEntry.qty : 0;
+              const available = transferDir === 'give' ? p.stock : branchQty;
+              return `
       <div style="padding:0.6rem 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
           <div>
             <span style="font-weight:500;font-size:0.85rem">${p.name}</span>
             ${p.grade ? `<span
               style="font-size:0.65rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.35rem;border-radius:4px;margin-left:0.3rem">${p.grade}</span>`
-            : ''}
+                  : ''}
           </div>
           <span style="font-size:0.75rem;color:${available > 0 ? 'var(--success)' : 'var(--danger)'}">
             ${transferDir === 'give' ? 'Main' : 'Branch'}: ${available}${p.unit}
@@ -1728,326 +1843,216 @@
             min="0" value="0" style="width:65px;padding:0.25rem 0.4rem;font-size:0.8rem" />
         </div>
       </div>`;
-      }).join('') || '<div class="empty-state">
-        <div class="empty-text">No products found</div>
-      </div>';
-      } catch(err) {
-      container.innerHTML = `<p class="text-danger">${err.message}</p>`;
-      }
-      }
-
-      async function executeTransfer() {
-      const inputs = document.querySelectorAll('#transfer-product-list input[type="number"]');
-      let transferred = 0;
-      const errors = [];
-
-      for (const inp of inputs) {
-      const qty = parseFloat(inp.value) || 0;
-      if (qty <= 0) continue; const productId=inp.dataset.productId; try { await apiFetch('/api/branches/transfer', {
-        method: 'POST' , body: JSON.stringify({ branchId: transferBranchId, productId, qty, direction: transferDir })
-        }); transferred++; } catch(err) { errors.push(err.message); } } if (transferred> 0) {
-        showToast(`✓ ${transferred} product(s) transferred`, 'success');
-        allBranches = await apiFetch('/api/branches') || [];
-        }
-        if (errors.length) showToast(errors[0], 'error');
-        if (transferred > 0) closeModal('transfer-modal');
+            }).join('') || '<div class="empty-state">
+              < div class="empty-text" > No products found</div >
+      </div > ';
+          } catch (err) {
+            container.innerHTML = `<p class="text-danger">${err.message}</p>`;
+          }
         }
 
-        <!-- ═══ BULK IMPORT MODAL ═══ -->
-        <div class="modal-overlay" id="import-modal">
-          <div class="modal" style="border-radius:20px 20px 0 0; max-height:92vh">
-            <div class="modal-handle"></div>
-            <div class="modal-title">📥 Bulk Import Data</div>
+        async function executeTransfer() {
+          const inputs = document.querySelectorAll('#transfer-product-list input[type="number"]');
+          let transferred = 0;
+          const errors = [];
 
-            <!-- Tab selector -->
-            <div style="display:flex;gap:0.4rem;margin-bottom:1rem">
-              <button class="period-tab active" id="imp-tab-products"
-                onclick="switchImportTab('products')">Products</button>
-              <button class="period-tab" id="imp-tab-sales" onclick="switchImportTab('sales')">Past Sales</button>
-              <button class="period-tab" id="imp-tab-costs" onclick="switchImportTab('costs')">Costs</button>
-            </div>
-
-            <!-- PRODUCTS TAB -->
-            <div id="imp-products-panel">
-              <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
-                Paste one product per line in this format:<br>
-                <code
-                  style="color:var(--gold);font-size:0.72rem">Name, Grade, Stock(ml), PurchaseRate, SellingPrice, LotName</code><br>
-                <span style="color:var(--text-muted);font-size:0.7rem">Example: Ehsas Al Arabia, A, 435, 1450, 220, 2nd
-                  LOT</span>
-              </p>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
-                <div>
-                  <label class="form-label">Category</label>
-                  <select class="form-select" id="imp-category">
-                    <option value="Attar">Attar</option>
-                    <option value="Apparel">Apparel</option>
-                    <option value="Gadget">Gadget</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="form-label">Unit</label>
-                  <select class="form-select" id="imp-unit">
-                    <option value="ml">ml</option>
-                    <option value="piece">piece</option>
-                  </select>
-                </div>
-              </div>
-              <textarea id="imp-products-text" class="form-input" rows="8"
-                placeholder="Ehsas Al Arabia, A, 435, 1450, 220, 2nd LOT&#10;Dior Sauvage, A, 270, 900, 180, 1st LOT&#10;Cool Water, B, 180, 600, 120, 1st LOT&#10;Versace, A, 600, 2000, 300, 1st LOT"
-                style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
-              <div id="imp-products-preview" style="margin-top:0.5rem"></div>
-            </div>
-
-            <!-- SALES TAB -->
-            <div id="imp-sales-panel" style="display:none">
-              <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
-                Paste past sales. Each sale = one line:<br>
-                <code
-                  style="color:var(--gold);font-size:0.72rem">CustomerName, ProductName, Qty(ml), Amount, Date(DD-Mon-YYYY)</code><br>
-                <span style="color:var(--text-muted);font-size:0.7rem">Example: Apu, Versace, 3.5, 200,
-                  10-Dec-2025</span><br>
-                <span style="color:var(--text-muted);font-size:0.7rem">⚠️ Past sales won't deduct current stock
-                  (historical
-                  only)</span>
-              </p>
-              <textarea id="imp-sales-text" class="form-input" rows="8"
-                placeholder="Apu, Versace, 3.5, 200, 10-Dec-2025&#10;Apu, Al Bakhoor, 3.5, 200, 10-Dec-2025&#10;Mawa, Dunhill Desire, 3.5, 500, 11-Dec-2025&#10;Jonayed, Dior Sauvage, 6, 310, 13-Dec-2025"
-                style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
-              <div id="imp-sales-preview" style="margin-top:0.5rem"></div>
-            </div>
-
-            <!-- COSTS TAB -->
-            <div id="imp-costs-panel" style="display:none">
-              <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem;line-height:1.5">
-                Paste one cost per line:<br>
-                <code style="color:var(--gold);font-size:0.72rem">Name, Amount, Category, Status</code><br>
-                <span style="color:var(--text-muted);font-size:0.7rem">Categories: Raw, Packaging, Equipment, Food,
-                  Marketing,
-                  Other</span><br>
-                <span style="color:var(--text-muted);font-size:0.7rem">Status: Paid, Due, Partial</span>
-              </p>
-              <textarea id="imp-costs-text" class="form-input" rows="8"
-                placeholder="Printer, 6000, Equipment, Paid&#10;Raw material, 5777, Raw, Partial&#10;Sticker Paper, 50, Packaging, Paid&#10;Bottle 3.5x5dzn, 900, Packaging, Paid&#10;Lunch, 760, Food, Paid"
-                style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
-              <div id="imp-costs-preview" style="margin-top:0.5rem"></div>
-            </div>
-
-            <!-- Progress bar (hidden by default) -->
-            <div id="imp-progress-wrap" style="display:none;margin-top:0.75rem">
-              <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.3rem">
-                <span id="imp-progress-label" style="color:var(--text-muted)">Importing...</span>
-                <span id="imp-progress-count" style="color:var(--gold)"></span>
-              </div>
-              <div style="background:var(--dark-4);border-radius:4px;height:6px;overflow:hidden">
-                <div id="imp-progress-bar"
-                  style="height:100%;background:var(--gold);width:0%;transition:width 0.2s;border-radius:4px"></div>
-              </div>
-            </div>
-
-            <!-- Result summary -->
-            <div id="imp-result"
-              style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:8px;font-size:0.82rem">
-            </div>
-
-            <div style="display:flex;gap:0.5rem;margin-top:1rem">
-              <button class="btn btn-outline" style="flex:1" onclick="closeModal('import-modal')">Close</button>
-              <button class="btn btn-primary" style="flex:1" id="imp-submit-btn" onclick="runImport()">Import
-                Now</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Toast -->
-        <div id="toast"></div>
-
-        <script>
-          // ═══════════════════════════════════════════════
-          //  CONFIG & STATE
-          // ═══════════════════════════════════════════════
-          const API = '';
-          let token = localStorage.getItem('nafas_token') || null;
-          let role = localStorage.getItem('nafas_role') || null;
-          let userName = localStorage.getItem('nafas_name') || null;
-          let userPerms = JSON.parse(localStorage.getItem('nafas_perms') || 'null');
-          let currentView = 'dashboard';
-          let cart = [];
-          let allProducts = [];
-          let allCombos = [];
-          let overrideTarget = null;
-          let allBranches = []; // loaded on init
-          let activeBranchId = null; // null = main store
-          let activeBranchName = 'Main Store';
-
-          // Permission helper — admin always true
-          function can(perm) {
-            if (role === 'admin') return true;
-            return !!(userPerms && userPerms[perm]);
+          for (const inp of inputs) {
+            const qty = parseFloat(inp.value) || 0;
+            if (qty <= 0) continue; const productId = inp.dataset.productId; try {
+              await apiFetch('/api/branches/transfer', {
+                method: 'POST', body: JSON.stringify({ branchId: transferBranchId, productId, qty, direction: transferDir })
+              }); transferred++;
+            } catch (err) { errors.push(err.message); }
+          } if (transferred > 0) {
+            showToast(`✓ ${transferred} product(s) transferred`, 'success');
+            allBranches = await apiFetch('/api/branches') || [];
           }
+          if (errors.length) showToast(errors[0], 'error');
+          if (transferred > 0) closeModal('transfer-modal');
+        }
+        const API = '';
+        let token = localStorage.getItem('nafas_token') || null;
+        let role = localStorage.getItem('nafas_role') || null;
+        let userName = localStorage.getItem('nafas_name') || null;
+        let userPerms = JSON.parse(localStorage.getItem('nafas_perms') || 'null');
+        let currentView = 'dashboard';
+        let cart = [];
+        let allProducts = [];
+        let allCombos = [];
+        let overrideTarget = null;
+        let allBranches = []; // loaded on init
+        let activeBranchId = null; // null = main store
+        let activeBranchName = 'Main Store';
 
-          // ═══════════════════════════════════════════════
-          //  AUTH
-          // ═══════════════════════════════════════════════
-          let pinBuffer = '';
+        // Permission helper — admin always true
+        function can(perm) {
+          if (role === 'admin') return true;
+          return !!(userPerms && userPerms[perm]);
+        }
 
-          function addPin(digit) {
-            if (pinBuffer.length >= 4) return;
-            pinBuffer += digit;
-            updatePinDisplay();
-            if (pinBuffer.length === 4) setTimeout(submitPin, 200);
+        // ═══════════════════════════════════════════════
+        //  AUTH
+        // ═══════════════════════════════════════════════
+        let pinBuffer = '';
+
+        function addPin(digit) {
+          if (pinBuffer.length >= 4) return;
+          pinBuffer += digit;
+          updatePinDisplay();
+          if (pinBuffer.length === 4) setTimeout(submitPin, 200);
+        }
+
+        function clearPin() {
+          pinBuffer = '';
+          updatePinDisplay();
+          document.getElementById('login-error').textContent = '';
+        }
+
+        function updatePinDisplay() {
+          for (let i = 0; i < 4; i++) {
+            document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinBuffer.length);
           }
+        }
 
-          function clearPin() {
+        async function submitPin() {
+          if (pinBuffer.length < 4) return;
+          try {
+            const res = await fetch(`${API}/api/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pin: pinBuffer })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            token = data.token;
+            role = data.role;
+            userName = data.name;
+            userPerms = data.permissions || null;
+
+            localStorage.setItem('nafas_token', token);
+            localStorage.setItem('nafas_role', role);
+            localStorage.setItem('nafas_name', userName || '');
+            localStorage.setItem('nafas_perms', JSON.stringify(userPerms));
+            initApp();
+          } catch (err) {
+            document.getElementById('login-error').textContent = err.message || 'Invalid PIN';
             pinBuffer = '';
             updatePinDisplay();
-            document.getElementById('login-error').textContent = '';
           }
+        }
 
-          function updatePinDisplay() {
-            for (let i = 0; i < 4; i++) {
-              document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinBuffer.length);
+        function logout() {
+          token = null; role = null; userName = null; userPerms = null;
+          localStorage.removeItem('nafas_token');
+          localStorage.removeItem('nafas_role');
+          localStorage.removeItem('nafas_name');
+          localStorage.removeItem('nafas_perms');
+          cart = [];
+          document.getElementById('login-screen').style.display = 'flex';
+          document.getElementById('app').style.display = 'none';
+          pinBuffer = ''; updatePinDisplay();
+          document.getElementById('login-error').textContent = '';
+        }
+
+        // ═══════════════════════════════════════════════
+        //  API HELPERS
+        // ═══════════════════════════════════════════════
+        async function apiFetch(path, opts = {}) {
+          const res = await fetch(API + path, {
+            ...opts,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              ...(opts.headers || {})
             }
-          }
+          });
+          if (res.status === 401) { logout(); return null; }
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Request failed');
+          return data;
+        }
 
-          async function submitPin() {
-            if (pinBuffer.length < 4) return;
-            try {
-              const res = await fetch(`${API}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pin: pinBuffer })
-              });
-              const data = await res.json();
-              if (!res.ok) throw new Error(data.message);
+        // ═══════════════════════════════════════════════
+        //  APP INIT
+        // ═══════════════════════════════════════════════
+        function initApp() {
+          document.getElementById('login-screen').style.display = 'none';
+          document.getElementById('app').style.display = 'flex';
+          document.getElementById('app').style.flexDirection = 'column';
+          const displayName = userName || (role === 'admin' ? 'Tanjim' : 'User');
+          document.getElementById('topbar-role').textContent = role === 'admin'
+            ? `👑 ${displayName}` : `👤 ${displayName}`;
+          // Load branches first, then build nav
+          loadBranchesAndInit();
+        }
 
-              token = data.token;
-              role = data.role;
-              userName = data.name;
-              userPerms = data.permissions || null;
-
-              localStorage.setItem('nafas_token', token);
-              localStorage.setItem('nafas_role', role);
-              localStorage.setItem('nafas_name', userName || '');
-              localStorage.setItem('nafas_perms', JSON.stringify(userPerms));
-              initApp();
-            } catch (err) {
-              document.getElementById('login-error').textContent = err.message || 'Invalid PIN';
-              pinBuffer = '';
-              updatePinDisplay();
-            }
-          }
-
-          function logout() {
-            token = null; role = null; userName = null; userPerms = null;
-            localStorage.removeItem('nafas_token');
-            localStorage.removeItem('nafas_role');
-            localStorage.removeItem('nafas_name');
-            localStorage.removeItem('nafas_perms');
-            cart = [];
-            document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('app').style.display = 'none';
-            pinBuffer = ''; updatePinDisplay();
-            document.getElementById('login-error').textContent = '';
-          }
-
-          // ═══════════════════════════════════════════════
-          //  API HELPERS
-          // ═══════════════════════════════════════════════
-          async function apiFetch(path, opts = {}) {
-            const res = await fetch(API + path, {
-              ...opts,
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-                ...(opts.headers || {})
+        async function loadBranchesAndInit() {
+          try {
+            allBranches = await apiFetch('/api/branches') || [];
+            // If user has assignedBranch, auto-select it
+            if (userPerms?.assignedBranchId) {
+              const assigned = allBranches.find(b => b._id === userPerms.assignedBranchId);
+              if (assigned) {
+                activeBranchId = assigned._id;
+                activeBranchName = assigned.name;
               }
-            });
-            if (res.status === 401) { logout(); return null; }
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Request failed');
-            return data;
-          }
-
-          // ═══════════════════════════════════════════════
-          //  APP INIT
-          // ═══════════════════════════════════════════════
-          function initApp() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('app').style.display = 'flex';
-            document.getElementById('app').style.flexDirection = 'column';
-            const displayName = userName || (role === 'admin' ? 'Tanjim' : 'User');
-            document.getElementById('topbar-role').textContent = role === 'admin'
-              ? `👑 ${displayName}` : `👤 ${displayName}`;
-            // Load branches first, then build nav
-            loadBranchesAndInit();
-          }
-
-          async function loadBranchesAndInit() {
-            try {
-              allBranches = await apiFetch('/api/branches') || [];
-              // If user has assignedBranch, auto-select it
-              if (userPerms?.assignedBranchId) {
-                const assigned = allBranches.find(b => b._id === userPerms.assignedBranchId);
-                if (assigned) {
-                  activeBranchId = assigned._id;
-                  activeBranchName = assigned.name;
-                }
-              }
-            } catch (e) {
-              allBranches = [];
             }
-            buildNav();
-            navigateTo(role === 'admin' ? 'dashboard' : (can('sellMain') || can('sellBranch') ? 'sale' : 'stock'));
+          } catch (e) {
+            allBranches = [];
           }
+          buildNav();
+          navigateTo(role === 'admin' ? 'dashboard' : (can('sellMain') || can('sellBranch') ? 'sale' : 'stock'));
+        }
 
-          function buildNav() {
-            const nav = document.getElementById('bottom-nav');
-            const items = [];
-            if (can('viewDashboard')) items.push({ id: 'dashboard', icon: 'dashboard', label: 'Dashboard' });
-            if (can('sellMain') || can('sellBranch')) items.push({ id: 'sale', icon: 'sale', label: 'Sale' });
-            if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: 'products', label: 'Products' });
-            if (can('viewHistory')) items.push({ id: 'history', icon: 'history', label: 'History' });
-            if (can('manageCosts')) items.push({ id: 'costs', icon: 'costs', label: 'Costs' });
-            if (role === 'admin') items.push({ id: 'users', icon: 'users', label: 'Users' });
-            if (items.length === 0) items.push({ id: 'stock', icon: 'stock', label: 'Stock' });
+        function buildNav() {
+          const nav = document.getElementById('bottom-nav');
+          const items = [];
+          if (can('viewDashboard')) items.push({ id: 'dashboard', icon: 'dashboard', label: 'Dashboard' });
+          if (can('sellMain') || can('sellBranch')) items.push({ id: 'sale', icon: 'sale', label: 'Sale' });
+          if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: 'products', label: 'Products' });
+          if (can('viewHistory')) items.push({ id: 'history', icon: 'history', label: 'History' });
+          if (can('manageCosts')) items.push({ id: 'costs', icon: 'costs', label: 'Costs' });
+          if (role === 'admin') items.push({ id: 'users', icon: 'users', label: 'Users' });
+          if (items.length === 0) items.push({ id: 'stock', icon: 'stock', label: 'Stock' });
 
-            nav.innerHTML = items.map(item => `
+          nav.innerHTML = items.map(item => `
     <button class="nav-item" id="nav-${item.id}" onclick="navigateTo('${item.id}')">
       <span class="nav-icon">${ICONS[item.icon]}</span>
       ${item.label}
     </button>
   `).join('');
-          }
+        }
 
-          function navigateTo(view) {
-            currentView = view;
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            const navEl = document.getElementById(`nav-${view}`);
-            if (navEl) navEl.classList.add('active');
+        function navigateTo(view) {
+          currentView = view;
+          document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+          const navEl = document.getElementById(`nav-${view}`);
+          if (navEl) navEl.classList.add('active');
 
-            const views = {
-              dashboard: renderDashboard,
-              sale: renderSaleEntry,
-              products: renderProducts,
-              history: renderHistory,
-              costs: renderCosts,
-              stock: renderStockView,
-              bottles: renderBottles,
-              users: renderUsers,
-            };
+          const views = {
+            dashboard: renderDashboard,
+            sale: renderSaleEntry,
+            products: renderProducts,
+            history: renderHistory,
+            costs: renderCosts,
+            stock: renderStockView,
+            bottles: renderBottles,
+            users: renderUsers,
+          };
 
-            const fn = views[view];
-            if (fn) fn();
-          }
+          const fn = views[view];
+          if (fn) fn();
+        }
 
-          // ═══════════════════════════════════════════════
-          //  DASHBOARD (Admin)
-          // ═══════════════════════════════════════════════
-          let dashPeriod = 'today';
+        // ═══════════════════════════════════════════════
+        //  DASHBOARD (Admin)
+        // ═══════════════════════════════════════════════
+        let dashPeriod = 'today';
 
-          async function renderDashboard() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `
+        async function renderDashboard() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `
     <div class="period-tabs">
       <button class="period-tab ${dashPeriod === 'today' ? 'active' : ''}" onclick="setDashPeriod('today')">Today</button>
       <button class="period-tab ${dashPeriod === 'week' ? 'active' : ''}" onclick="setDashPeriod('week')">This Week</button>
@@ -2056,29 +2061,29 @@
     </div>
     <div class="loading-center"><div class="spinner"></div></div>
   `;
-            try {
-              const [data, products, allTimeData] = await Promise.all([
-                apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
-                apiFetch('/api/products'),
-                apiFetch('/api/dashboard/stats?period=all')  // always all time for savings
-              ]);
-              if (!data) return;
+          try {
+            const [data, products, allTimeData] = await Promise.all([
+              apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
+              apiFetch('/api/products'),
+              apiFetch('/api/dashboard/stats?period=all')  // always all time for savings
+            ]);
+            if (!data) return;
 
-              // Market value: stock * (purchaseRate/100) for ml-based products
-              const marketValue = products.reduce((s, p) => {
-                if (p.unit === 'ml' && p.purchaseRate > 0) {
-                  return s + (p.stock * (p.purchaseRate / 100));
-                }
-                return s + (p.stock * p.purchaseRate);
-              }, 0);
+            // Market value: stock * (purchaseRate/100) for ml-based products
+            const marketValue = products.reduce((s, p) => {
+              if (p.unit === 'ml' && p.purchaseRate > 0) {
+                return s + (p.stock * (p.purchaseRate / 100));
+              }
+              return s + (p.stock * p.purchaseRate);
+            }, 0);
 
-              // Savings = Revenue - All operational costs
-              const savings = allTimeData.totalRevenue - allTimeData.totalExtraCosts;
+            // Savings = Revenue - All operational costs
+            const savings = allTimeData.totalRevenue - allTimeData.totalExtraCosts;
 
-              // Tanjim stock summary
-              const tanjimProducts = products.filter(p => (p.tanjimStock || 0) > 0);
+            // Tanjim stock summary
+            const tanjimProducts = products.filter(p => (p.tanjimStock || 0) > 0);
 
-              el.innerHTML = `
+            el.innerHTML = `
       <div class="period-tabs">
         ${['today', 'week', 'month', 'all'].map(p => `
           <button class="period-tab ${dashPeriod === p ? 'active' : ''}" onclick="setDashPeriod('${p}')">${{ today: 'Today', week: 'This Week', month: 'This Month', all: 'All Time' }[p]}</button>
@@ -2166,54 +2171,54 @@
         </div>
       ` : `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">No sales recorded yet</div></div>`}
     `;
-            } catch (err) {
-              showToast(err.message, 'error');
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        function setDashPeriod(p) { dashPeriod = p; renderDashboard(); }
+
+        // ═══════════════════════════════════════════════
+        //  SALE ENTRY
+        // ═══════════════════════════════════════════════
+        let activeSaleStore = 'siam'; // 'Main' or 'tanjim'
+
+        async function renderSaleEntry() {
+          const el = document.getElementById('main-content');
+
+          // Build store buttons dynamically from branches
+          const canMain = can('sellMain');
+          const canBranch = can('sellBranch');
+
+          // Available stores for this user
+          const stores = [];
+          if (canMain) stores.push({ id: null, name: 'Main Store', sub: 'Main Warehouse' });
+          if (canBranch) {
+            // If user has assigned branch, only show that
+            if (userPerms?.assignedBranchId) {
+              const b = allBranches.find(x => x._id === userPerms.assignedBranchId);
+              if (b) stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' });
+            } else {
+              // Admin or unassigned — show all branches
+              allBranches.forEach(b => stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' }));
             }
           }
 
-          function setDashPeriod(p) { dashPeriod = p; renderDashboard(); }
+          // If only one store, auto-select it
+          if (stores.length === 1 && activeBranchId === null && stores[0].id !== null) {
+            activeBranchId = stores[0].id;
+            activeBranchName = stores[0].name;
+          }
 
-          // ═══════════════════════════════════════════════
-          //  SALE ENTRY
-          // ═══════════════════════════════════════════════
-          let activeSaleStore = 'siam'; // 'Main' or 'tanjim'
+          const cols = stores.length > 1 ? `repeat(${Math.min(stores.length, 3)}, 1fr)` : '1fr';
 
-          async function renderSaleEntry() {
-            const el = document.getElementById('main-content');
-
-            // Build store buttons dynamically from branches
-            const canMain = can('sellMain');
-            const canBranch = can('sellBranch');
-
-            // Available stores for this user
-            const stores = [];
-            if (canMain) stores.push({ id: null, name: 'Main Store', sub: 'Main Warehouse' });
-            if (canBranch) {
-              // If user has assigned branch, only show that
-              if (userPerms?.assignedBranchId) {
-                const b = allBranches.find(x => x._id === userPerms.assignedBranchId);
-                if (b) stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' });
-              } else {
-                // Admin or unassigned — show all branches
-                allBranches.forEach(b => stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' }));
-              }
-            }
-
-            // If only one store, auto-select it
-            if (stores.length === 1 && activeBranchId === null && stores[0].id !== null) {
-              activeBranchId = stores[0].id;
-              activeBranchName = stores[0].name;
-            }
-
-            const cols = stores.length > 1 ? `repeat(${Math.min(stores.length, 3)}, 1fr)` : '1fr';
-
-            el.innerHTML = `
+          el.innerHTML = `
     <!-- STORE SELECTOR -->
     ${stores.length > 0 ? `
     <div style="display:grid;grid-template-columns:${cols};gap:0.5rem;margin-bottom:0.75rem">
       ${stores.map(s => {
-              const isActive = activeBranchId === s.id;
-              return `<button onclick="setSaleStore('${s.id}', '${s.name}')"
+            const isActive = activeBranchId === s.id;
+            return `<button onclick="setSaleStore('${s.id}', '${s.name}')"
           style="padding:0.85rem;border-radius:var(--radius);
           border:2px solid ${isActive ? 'var(--gold)' : 'var(--border)'};
           background:${isActive ? 'var(--gold-dim)' : 'var(--card)'};
@@ -2223,7 +2228,7 @@
           ${s.id === null ? '🏪' : '🏬'} ${s.name}
           <div style="font-size:0.62rem;font-weight:400;margin-top:0.2rem;opacity:0.75">${s.sub}</div>
         </button>`;
-            }).join('')}
+          }).join('')}
     </div>` : ''}
 
     <div class="card">
@@ -2319,39 +2324,39 @@
     </button>
   `;
 
-            setTimeout(() => {
-              const d = document.getElementById('sale-date');
-              if (d) d.value = new Date().toISOString().split('T')[0];
-            }, 50);
-            renderCartItems();
+          setTimeout(() => {
+            const d = document.getElementById('sale-date');
+            if (d) d.value = new Date().toISOString().split('T')[0];
+          }, 50);
+          renderCartItems();
+        }
+
+        function setSaleStore(branchId, branchName) {
+          // branchId is the string 'null' from onclick attr when main store
+          activeBranchId = (branchId === 'null' || branchId === null) ? null : branchId;
+          activeBranchName = branchName || 'Main Store';
+          cart = [];
+          renderSaleEntry();
+        }
+
+        function renderCartItems() {
+          const el = document.getElementById('cart-items');
+          if (!el) return;
+          if (cart.length === 0) {
+            el.innerHTML = `<div class="empty-state" style="padding:1.25rem"><div class="empty-icon">🛒</div><div class="empty-text">No items added yet</div></div>`;
+            updateCartTotal();
+            return;
           }
 
-          function setSaleStore(branchId, branchName) {
-            // branchId is the string 'null' from onclick attr when main store
-            activeBranchId = (branchId === 'null' || branchId === null) ? null : branchId;
-            activeBranchName = branchName || 'Main Store';
-            cart = [];
-            renderSaleEntry();
-          }
-
-          function renderCartItems() {
-            const el = document.getElementById('cart-items');
-            if (!el) return;
-            if (cart.length === 0) {
-              el.innerHTML = `<div class="empty-state" style="padding:1.25rem"><div class="empty-icon">🛒</div><div class="empty-text">No items added yet</div></div>`;
-              updateCartTotal();
-              return;
-            }
-
-            el.innerHTML = cart.map((item, idx) => {
-              // totalPrice = perMlPrice × qty (for products), or unitPrice flat (for combos)
-              const totalPrice = (item.perMlPrice && item.itemType === 'Product')
-                ? item.perMlPrice * item.qty
-                : item.unitPrice;
-              const pricePerUnit = item.perMlPrice
-                ? (item.perMlPrice * item.qty).toFixed(0)
-                : item.unitPrice.toFixed(0);
-              return `
+          el.innerHTML = cart.map((item, idx) => {
+            // totalPrice = perMlPrice × qty (for products), or unitPrice flat (for combos)
+            const totalPrice = (item.perMlPrice && item.itemType === 'Product')
+              ? item.perMlPrice * item.qty
+              : item.unitPrice;
+            const pricePerUnit = item.perMlPrice
+              ? (item.perMlPrice * item.qty).toFixed(0)
+              : item.unitPrice.toFixed(0);
+            return `
     <div class="cart-item">
       <div style="flex:1">
         <div class="cart-item-name">
@@ -2378,70 +2383,70 @@
         <button class="icon-btn" onclick="removeCartItem(${idx})" title="Remove">✕</button>
       </div>
     </div>`;
-            }).join('');
+          }).join('');
 
-            updateCartTotal();
+          updateCartTotal();
+        }
+
+        function updateCartTotal() {
+          const total = cart.reduce((s, i) => {
+            const lineTotal = (i.perMlPrice && i.itemType === 'Product')
+              ? i.perMlPrice * i.qty
+              : i.unitPrice;
+            return s + lineTotal;
+          }, 0);
+          const pkg = parseFloat(document.getElementById('ec-packaging')?.value || 0);
+          const del = parseFloat(document.getElementById('ec-delivery')?.value || 0);
+          const oth = parseFloat(document.getElementById('ec-others')?.value || 0);
+          const costs = pkg + del + oth;
+
+          const totalEl = document.getElementById('sale-total');
+          const costsEl = document.getElementById('sale-costs');
+          const profitEl = document.getElementById('sale-profit');
+
+          if (totalEl) totalEl.textContent = `৳${total.toFixed(0)}`;
+          if (costsEl) costsEl.textContent = `-৳${costs.toFixed(0)}`;
+          if (profitEl) profitEl.textContent = `৳${(total - costs).toFixed(0)}`;
+        }
+
+        function removeCartItem(idx) {
+          cart.splice(idx, 1);
+          renderCartItems();
+        }
+
+        async function openAddItemModal() {
+          openModal('add-item-modal');
+          document.getElementById('item-search').value = '';
+          document.getElementById('item-list-container').innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+
+          try {
+            [allProducts, allCombos] = await Promise.all([
+              apiFetch('/api/products'),
+              apiFetch('/api/combos')
+            ]);
+            renderItemList(allProducts, allCombos);
+          } catch (err) {
+            document.getElementById('item-list-container').innerHTML = `<p class="text-danger" style="text-align:center;padding:1rem">${err.message}</p>`;
           }
+        }
 
-          function updateCartTotal() {
-            const total = cart.reduce((s, i) => {
-              const lineTotal = (i.perMlPrice && i.itemType === 'Product')
-                ? i.perMlPrice * i.qty
-                : i.unitPrice;
-              return s + lineTotal;
-            }, 0);
-            const pkg = parseFloat(document.getElementById('ec-packaging')?.value || 0);
-            const del = parseFloat(document.getElementById('ec-delivery')?.value || 0);
-            const oth = parseFloat(document.getElementById('ec-others')?.value || 0);
-            const costs = pkg + del + oth;
+        function filterItems() {
+          const q = document.getElementById('item-search').value.toLowerCase();
+          const fp = allProducts.filter(p => p.name.toLowerCase().includes(q));
+          const fc = allCombos.filter(c => c.name.toLowerCase().includes(q));
+          renderItemList(fp, fc);
+        }
 
-            const totalEl = document.getElementById('sale-total');
-            const costsEl = document.getElementById('sale-costs');
-            const profitEl = document.getElementById('sale-profit');
+        function renderItemList(products, combos) {
+          const el = document.getElementById('item-list-container');
+          let html = '';
 
-            if (totalEl) totalEl.textContent = `৳${total.toFixed(0)}`;
-            if (costsEl) costsEl.textContent = `-৳${costs.toFixed(0)}`;
-            if (profitEl) profitEl.textContent = `৳${(total - costs).toFixed(0)}`;
-          }
-
-          function removeCartItem(idx) {
-            cart.splice(idx, 1);
-            renderCartItems();
-          }
-
-          async function openAddItemModal() {
-            openModal('add-item-modal');
-            document.getElementById('item-search').value = '';
-            document.getElementById('item-list-container').innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
-
-            try {
-              [allProducts, allCombos] = await Promise.all([
-                apiFetch('/api/products'),
-                apiFetch('/api/combos')
-              ]);
-              renderItemList(allProducts, allCombos);
-            } catch (err) {
-              document.getElementById('item-list-container').innerHTML = `<p class="text-danger" style="text-align:center;padding:1rem">${err.message}</p>`;
-            }
-          }
-
-          function filterItems() {
-            const q = document.getElementById('item-search').value.toLowerCase();
-            const fp = allProducts.filter(p => p.name.toLowerCase().includes(q));
-            const fc = allCombos.filter(c => c.name.toLowerCase().includes(q));
-            renderItemList(fp, fc);
-          }
-
-          function renderItemList(products, combos) {
-            const el = document.getElementById('item-list-container');
-            let html = '';
-
-            if (combos && combos.length) {
-              html += `<div class="section-title">Combos</div>`;
-              combos.forEach(c => {
-                const idx = _itemCache.push(c) - 1;
-                _itemCacheTypes.push('Combo');
-                html += `
+          if (combos && combos.length) {
+            html += `<div class="section-title">Combos</div>`;
+            combos.forEach(c => {
+              const idx = _itemCache.push(c) - 1;
+              _itemCacheTypes.push('Combo');
+              html += `
         <div class="item-row selectable-item" data-idx="${idx}">
           <div>
             <div class="item-name">${c.name} <span class="combo-badge">COMBO</span></div>
@@ -2449,22 +2454,22 @@
           </div>
           <div class="item-stock stock-ok">৳${c.comboPrice}</div>
         </div>`;
-              });
-            }
+            });
+          }
 
-            if (products && products.length) {
-              html += `<div class="section-title">Products</div>`;
-              products.forEach(p => {
-                const idx = _itemCache.push(p) - 1;
-                _itemCacheTypes.push('Product');
-                // Show Tanjim's stock if Tanjim store is active
-                let displayStock = p.stock; // default main
-                if (activeBranchId) {
-                  const entry = (p.branchStock || []).find(b => b.branchId === activeBranchId);
-                  displayStock = entry ? entry.qty : 0;
-                } const stockClass = displayStock <= p.lowStockAlert ? 'stock-low' : 'stock-ok';
-                const stockLabel = `${displayStock}${p.unit}`;
-                html += `
+          if (products && products.length) {
+            html += `<div class="section-title">Products</div>`;
+            products.forEach(p => {
+              const idx = _itemCache.push(p) - 1;
+              _itemCacheTypes.push('Product');
+              // Show Tanjim's stock if Tanjim store is active
+              let displayStock = p.stock; // default main
+              if (activeBranchId) {
+                const entry = (p.branchStock || []).find(b => b.branchId === activeBranchId);
+                displayStock = entry ? entry.qty : 0;
+              } const stockClass = displayStock <= p.lowStockAlert ? 'stock-low' : 'stock-ok';
+              const stockLabel = `${displayStock}${p.unit}`;
+              html += `
         <div class="item-row selectable-item" data-idx="${idx}" style="${displayStock <= 0 ? 'opacity:0.4;pointer-events:none' : ''}">
           <div>
             <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
@@ -2472,139 +2477,139 @@
           </div>
           <div class="item-stock ${stockClass}">${stockLabel}</div>
         </div>`;
-              });
-            }
-
-            if (!html) html = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">No items found</div></div>`;
-            el.innerHTML = html;
-
-            // Event delegation - one listener, no inline onclick issues
-            el.querySelectorAll('.selectable-item').forEach(row => {
-              row.addEventListener('click', () => {
-                const idx = parseInt(row.dataset.idx);
-                const type = _itemCacheTypes[idx];
-                const item = _itemCache[idx];
-                if (type === 'Combo') {
-                  addToCart(item._id, 'Combo', item.name, item.comboPrice);
-                } else {
-                  addToCart(item._id, 'Product', item.name, item.sellingPrice);
-                }
-              });
             });
           }
 
-          // Cache to avoid passing data through HTML attributes
-          let _itemCache = [];
-          let _itemCacheTypes = [];
+          if (!html) html = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">No items found</div></div>`;
+          el.innerHTML = html;
 
-          function addToCart(id, type, name, price) {
-            const existing = cart.find(i => i.itemId === id && i.itemType === type);
-            if (existing) {
-              existing.qty += type === 'Product' ? 3.5 : 1;
-            } else {
-              cart.push({
-                itemId: id,
-                itemType: type,
-                name,
-                qty: type === 'Product' ? 3.5 : 1,
-                unitPrice: price,           // base price (3.5ml price for products)
-                originalPrice: price,
-                perMlPrice: type === 'Product' ? price / 3.5 : null,
-                isOverridden: false
-              });
-            }
-            closeModal('add-item-modal');
-            renderCartItems();
-            showToast(`✓ ${name} added to cart`, 'success');
-          }
-
-          // ── Qty controls ──
-          function changeCartQty(idx, delta) {
-            const item = cart[idx];
-            const newQty = Math.max(0.5, parseFloat((item.qty + delta).toFixed(1)));
-            setCartQty(idx, newQty);
-          }
-
-          function setCartQty(idx, val) {
-            const newQty = parseFloat(parseFloat(val).toFixed(1));
-            if (isNaN(newQty) || newQty <= 0) return;
-            const item = cart[idx];
-            item.qty = newQty;
-            // For products: unitPrice stays as 3.5ml base price, perMlPrice drives total
-            // For overridden: don't touch unitPrice, just update qty
-            renderCartItems();
-            updateCartTotal();
-          }
-
-          // Price Override
-          function openOverride(idx) {
-            overrideTarget = idx;
-            const item = cart[idx];
-            document.getElementById('override-product-name').textContent = item.name;
-            // Show current total price as the override reference
-            const currentTotal = item.perMlPrice ? item.perMlPrice * item.qty : item.unitPrice;
-            document.getElementById('override-original').value = `৳${item.originalPrice} (3.5ml base)`;
-            document.getElementById('override-price').value = Math.round(currentTotal);
-            openModal('override-modal');
-          }
-
-          function applyOverride() {
-            const price = parseFloat(document.getElementById('override-price').value);
-            if (isNaN(price) || price < 0) return showToast('Enter a valid price', 'error');
-            const item = cart[overrideTarget];
-            // Override: store as perMlPrice so qty changes still work
-            item.perMlPrice = price / item.qty;
-            item.unitPrice = price;
-            item.isOverridden = true;
-            closeModal('override-modal');
-            renderCartItems();
-          }
-
-          async function submitSale() {
-            if (cart.length === 0) return showToast('Add at least one item', 'error');
-
-            const body = {
-              customerName: document.getElementById('sale-customer').value || 'Walk-in',
-              customerPhone: document.getElementById('sale-phone').value || '',
-              channel: document.getElementById('sale-channel').value,
-              notes: document.getElementById('sale-notes').value,
-              branchId: activeBranchId || null,
-              branchName: activeBranchName || 'Main Store',
-              date: document.getElementById('sale-date').value || new Date().toISOString(),
-              items: cart.map(i => ({
-                itemId: i.itemId,
-                itemType: i.itemType,
-                qty: parseFloat(i.qty),
-                overridePrice: i.originalPrice
-              })),
-              extraCosts: {
-                packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
-                delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
-                others: parseFloat(document.getElementById('ec-others').value || 0),
-                otherNote: document.getElementById('ec-note').value || ''
+          // Event delegation - one listener, no inline onclick issues
+          el.querySelectorAll('.selectable-item').forEach(row => {
+            row.addEventListener('click', () => {
+              const idx = parseInt(row.dataset.idx);
+              const type = _itemCacheTypes[idx];
+              const item = _itemCache[idx];
+              if (type === 'Combo') {
+                addToCart(item._id, 'Combo', item.name, item.comboPrice);
+              } else {
+                addToCart(item._id, 'Product', item.name, item.sellingPrice);
               }
-            };
+            });
+          });
+        }
 
-            try {
-              await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
-              const soldItems = [...cart]; // save copy BEFORE clearing
-              cart = [];
-              deductBottlesAfterSale(soldItems); // use the saved copy
-              showToast(`✓ ${activeSaleStore === 'tanjim' ? "Tanjim's sale" : 'Sale'} recorded!`, 'success');
-              renderSaleEntry();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+        // Cache to avoid passing data through HTML attributes
+        let _itemCache = [];
+        let _itemCacheTypes = [];
+
+        function addToCart(id, type, name, price) {
+          const existing = cart.find(i => i.itemId === id && i.itemType === type);
+          if (existing) {
+            existing.qty += type === 'Product' ? 3.5 : 1;
+          } else {
+            cart.push({
+              itemId: id,
+              itemType: type,
+              name,
+              qty: type === 'Product' ? 3.5 : 1,
+              unitPrice: price,           // base price (3.5ml price for products)
+              originalPrice: price,
+              perMlPrice: type === 'Product' ? price / 3.5 : null,
+              isOverridden: false
+            });
           }
+          closeModal('add-item-modal');
+          renderCartItems();
+          showToast(`✓ ${name} added to cart`, 'success');
+        }
 
-          // ═══════════════════════════════════════════════
-          //  PRODUCTS (Admin)
-          // ═══════════════════════════════════════════════
-          let productFilter = 'all';
+        // ── Qty controls ──
+        function changeCartQty(idx, delta) {
+          const item = cart[idx];
+          const newQty = Math.max(0.5, parseFloat((item.qty + delta).toFixed(1)));
+          setCartQty(idx, newQty);
+        }
 
-          async function renderProducts() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `
+        function setCartQty(idx, val) {
+          const newQty = parseFloat(parseFloat(val).toFixed(1));
+          if (isNaN(newQty) || newQty <= 0) return;
+          const item = cart[idx];
+          item.qty = newQty;
+          // For products: unitPrice stays as 3.5ml base price, perMlPrice drives total
+          // For overridden: don't touch unitPrice, just update qty
+          renderCartItems();
+          updateCartTotal();
+        }
+
+        // Price Override
+        function openOverride(idx) {
+          overrideTarget = idx;
+          const item = cart[idx];
+          document.getElementById('override-product-name').textContent = item.name;
+          // Show current total price as the override reference
+          const currentTotal = item.perMlPrice ? item.perMlPrice * item.qty : item.unitPrice;
+          document.getElementById('override-original').value = `৳${item.originalPrice} (3.5ml base)`;
+          document.getElementById('override-price').value = Math.round(currentTotal);
+          openModal('override-modal');
+        }
+
+        function applyOverride() {
+          const price = parseFloat(document.getElementById('override-price').value);
+          if (isNaN(price) || price < 0) return showToast('Enter a valid price', 'error');
+          const item = cart[overrideTarget];
+          // Override: store as perMlPrice so qty changes still work
+          item.perMlPrice = price / item.qty;
+          item.unitPrice = price;
+          item.isOverridden = true;
+          closeModal('override-modal');
+          renderCartItems();
+        }
+
+        async function submitSale() {
+          if (cart.length === 0) return showToast('Add at least one item', 'error');
+
+          const body = {
+            customerName: document.getElementById('sale-customer').value || 'Walk-in',
+            customerPhone: document.getElementById('sale-phone').value || '',
+            channel: document.getElementById('sale-channel').value,
+            notes: document.getElementById('sale-notes').value,
+            branchId: activeBranchId || null,
+            branchName: activeBranchName || 'Main Store',
+            date: document.getElementById('sale-date').value || new Date().toISOString(),
+            items: cart.map(i => ({
+              itemId: i.itemId,
+              itemType: i.itemType,
+              qty: parseFloat(i.qty),
+              overridePrice: i.originalPrice
+            })),
+            extraCosts: {
+              packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
+              delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
+              others: parseFloat(document.getElementById('ec-others').value || 0),
+              otherNote: document.getElementById('ec-note').value || ''
+            }
+          };
+
+          try {
+            await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
+            const soldItems = [...cart]; // save copy BEFORE clearing
+            cart = [];
+            deductBottlesAfterSale(soldItems); // use the saved copy
+            showToast(`✓ ${activeSaleStore === 'tanjim' ? "Tanjim's sale" : 'Sale'} recorded!`, 'success');
+            renderSaleEntry();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        // ═══════════════════════════════════════════════
+        //  PRODUCTS (Admin)
+        // ═══════════════════════════════════════════════
+        let productFilter = 'all';
+
+        async function renderProducts() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
       <div class="period-tabs" style="margin:0;flex:1">
         <button class="period-tab ${productFilter === 'all' ? 'active' : ''}" onclick="setProductFilter('all')">All</button>
@@ -2620,12 +2625,12 @@
     <div class="loading-center"><div class="spinner"></div></div>
   `;
 
-            try {
-              const url = productFilter !== 'all' ? `/api/products?category=${productFilter}` : '/api/products';
-              const products = await apiFetch(url);
-              allProducts = products;
+          try {
+            const url = productFilter !== 'all' ? `/api/products?category=${productFilter}` : '/api/products';
+            const products = await apiFetch(url);
+            allProducts = products;
 
-              el.innerHTML = `
+            el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
         <div class="period-tabs" style="margin:0;flex:1">
           ${['all', 'Attar', 'Apparel', 'Gadget'].map(f => `<button class="period-tab ${productFilter === f ? 'active' : ''}" onclick="setProductFilter('${f}')">${f === 'all' ? 'All' : f}</button>`).join('')}
@@ -2646,10 +2651,10 @@
       </div>
       <div class="card">
         ${products.length === 0 ? `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No products yet</div></div>` :
-                  products.map(p => {
-                    const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
-                    const tanjim = p.tanjimStock || 0;
-                    return `
+                products.map(p => {
+                  const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+                  const tanjim = p.tanjimStock || 0;
+                  return `
             <div class="item-row">
               <div style="flex:1">
                 <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
@@ -2669,107 +2674,107 @@
                 </div>
               </div>
             </div>`;
-                  }).join('')}
+                }).join('')}
       </div>
     `;
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-            // Calculate and show total market value
-            try {
-              const mv = document.getElementById('market-value-display');
-              if (mv && allProducts.length) {
-                const total = allProducts.reduce((s, p) => {
-                  return s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate);
-                }, 0);
-                mv.textContent = `৳${Math.round(total).toLocaleString()}`;
-              }
-            } catch (e) { }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+          // Calculate and show total market value
+          try {
+            const mv = document.getElementById('market-value-display');
+            if (mv && allProducts.length) {
+              const total = allProducts.reduce((s, p) => {
+                return s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate);
+              }, 0);
+              mv.textContent = `৳${Math.round(total).toLocaleString()}`;
+            }
+          } catch (e) { }
+        }
 
-          async function openProductModal(id = null) {
-            document.getElementById('product-edit-id').value = id || '';
-            document.getElementById('product-modal-title').textContent = id ? 'Edit Product' : 'Add Product';
+        async function openProductModal(id = null) {
+          document.getElementById('product-edit-id').value = id || '';
+          document.getElementById('product-modal-title').textContent = id ? 'Edit Product' : 'Add Product';
 
+          if (id) {
+            try {
+              const p = await apiFetch(`/api/products/${id}`);
+              document.getElementById('p-name').value = p.name;
+              document.getElementById('p-category').value = p.category;
+              document.getElementById('p-grade').value = p.grade || '';
+              document.getElementById('p-stock').value = p.stock;
+              document.getElementById('p-unit').value = p.unit;
+              document.getElementById('p-purchase').value = p.purchaseRate;
+              document.getElementById('p-sell').value = p.sellingPrice;
+              document.getElementById('p-lowstock').value = p.lowStockAlert;
+              document.getElementById('p-lot').value = p.lotInfo?.lotName || '';
+              document.getElementById('p-notes').value = p.notes || '';
+            } catch (err) {
+              showToast(err.message, 'error'); return;
+            }
+          } else {
+            ['p-name', 'p-stock', 'p-purchase', 'p-sell', 'p-lot', 'p-notes'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('p-grade').value = '';
+            document.getElementById('p-category').value = 'Attar';
+            document.getElementById('p-unit').value = 'ml';
+            document.getElementById('p-lowstock').value = '10';
+          }
+          openModal('product-modal');
+        }
+
+        async function saveProduct() {
+          const id = document.getElementById('product-edit-id').value;
+          const body = {
+            name: document.getElementById('p-name').value.trim(),
+            category: document.getElementById('p-category').value,
+            grade: document.getElementById('p-grade').value,
+            stock: parseFloat(document.getElementById('p-stock').value) || 0,
+            unit: document.getElementById('p-unit').value,
+            purchaseRate: parseFloat(document.getElementById('p-purchase').value) || 0,
+            sellingPrice: parseFloat(document.getElementById('p-sell').value) || 0,
+            lowStockAlert: parseFloat(document.getElementById('p-lowstock').value) || 10,
+            notes: document.getElementById('p-notes').value,
+            'lotInfo.lotName': document.getElementById('p-lot').value,
+          };
+          if (!body.name) return showToast('Product name required', 'error');
+
+          try {
             if (id) {
-              try {
-                const p = await apiFetch(`/api/products/${id}`);
-                document.getElementById('p-name').value = p.name;
-                document.getElementById('p-category').value = p.category;
-                document.getElementById('p-grade').value = p.grade || '';
-                document.getElementById('p-stock').value = p.stock;
-                document.getElementById('p-unit').value = p.unit;
-                document.getElementById('p-purchase').value = p.purchaseRate;
-                document.getElementById('p-sell').value = p.sellingPrice;
-                document.getElementById('p-lowstock').value = p.lowStockAlert;
-                document.getElementById('p-lot').value = p.lotInfo?.lotName || '';
-                document.getElementById('p-notes').value = p.notes || '';
-              } catch (err) {
-                showToast(err.message, 'error'); return;
-              }
+              await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+              showToast('Product updated ✓', 'success');
             } else {
-              ['p-name', 'p-stock', 'p-purchase', 'p-sell', 'p-lot', 'p-notes'].forEach(id => document.getElementById(id).value = '');
-              document.getElementById('p-grade').value = '';
-              document.getElementById('p-category').value = 'Attar';
-              document.getElementById('p-unit').value = 'ml';
-              document.getElementById('p-lowstock').value = '10';
+              await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) });
+              showToast('Product added ✓', 'success');
             }
-            openModal('product-modal');
+            closeModal('product-modal');
+            renderProducts();
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          async function saveProduct() {
-            const id = document.getElementById('product-edit-id').value;
-            const body = {
-              name: document.getElementById('p-name').value.trim(),
-              category: document.getElementById('p-category').value,
-              grade: document.getElementById('p-grade').value,
-              stock: parseFloat(document.getElementById('p-stock').value) || 0,
-              unit: document.getElementById('p-unit').value,
-              purchaseRate: parseFloat(document.getElementById('p-purchase').value) || 0,
-              sellingPrice: parseFloat(document.getElementById('p-sell').value) || 0,
-              lowStockAlert: parseFloat(document.getElementById('p-lowstock').value) || 10,
-              notes: document.getElementById('p-notes').value,
-              'lotInfo.lotName': document.getElementById('p-lot').value,
-            };
-            if (!body.name) return showToast('Product name required', 'error');
-
-            try {
-              if (id) {
-                await apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(body) });
-                showToast('Product updated ✓', 'success');
-              } else {
-                await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(body) });
-                showToast('Product added ✓', 'success');
-              }
-              closeModal('product-modal');
-              renderProducts();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+        async function deleteProduct(id, name) {
+          if (!confirm(`Remove "${name}" from product list?`)) return;
+          try {
+            await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
+            showToast('Product removed', 'success');
+            renderProducts();
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          async function deleteProduct(id, name) {
-            if (!confirm(`Remove "${name}" from product list?`)) return;
-            try {
-              await apiFetch(`/api/products/${id}`, { method: 'DELETE' });
-              showToast('Product removed', 'success');
-              renderProducts();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-          }
+        // ═══════════════════════════════════════════════
+        //  TANJIM STOCK DISTRIBUTION
+        // ═══════════════════════════════════════════════
+        let tanjimProductCache = [];
 
-          // ═══════════════════════════════════════════════
-          //  TANJIM STOCK DISTRIBUTION
-          // ═══════════════════════════════════════════════
-          let tanjimProductCache = [];
+        async function openTanjimModal() {
+          tanjimProductCache = await apiFetch('/api/products') || [];
+          const attars = tanjimProductCache.filter(p => p.category === 'Attar');
 
-          async function openTanjimModal() {
-            tanjimProductCache = await apiFetch('/api/products') || [];
-            const attars = tanjimProductCache.filter(p => p.category === 'Attar');
-
-            const container = document.getElementById('tanjim-list');
-            container.innerHTML = attars.map((p, i) => `
+          const container = document.getElementById('tanjim-list');
+          container.innerHTML = attars.map((p, i) => `
     <div style="padding:0.65rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
         <div>
@@ -2793,98 +2798,98 @@
     </div>
   `).join('');
 
-            openModal('tanjim-modal');
-          }
+          openModal('tanjim-modal');
+        }
 
-          function setTanjimQty(i, qty) {
+        function setTanjimQty(i, qty) {
+          const inp = document.getElementById(`tanjim-qty-${i}`);
+          if (inp) inp.value = qty;
+        }
+
+        async function saveTanjimDistribution() {
+          const attars = tanjimProductCache.filter(p => p.category === 'Attar');
+          let updated = 0;
+          const errors = [];
+
+          for (let i = 0; i < attars.length; i++) {
             const inp = document.getElementById(`tanjim-qty-${i}`);
-            if (inp) inp.value = qty;
-          }
+            if (!inp) continue;
+            const qty = parseFloat(inp.value) || 0;
+            if (qty <= 0) continue;
 
-          async function saveTanjimDistribution() {
-            const attars = tanjimProductCache.filter(p => p.category === 'Attar');
-            let updated = 0;
-            const errors = [];
+            const p = attars[i];
+            if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
 
-            for (let i = 0; i < attars.length; i++) {
-              const inp = document.getElementById(`tanjim-qty-${i}`);
-              if (!inp) continue;
-              const qty = parseFloat(inp.value) || 0;
-              if (qty <= 0) continue;
-
-              const p = attars[i];
-              if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
-
-              try {
-                // Only send the fields that need to change — avoid spreading entire object
-                await apiFetch(`/api/products/${p._id}`, {
-                  method: 'PUT',
-                  body: JSON.stringify({
-                    stock: parseFloat((p.stock - qty).toFixed(1)),
-                    tanjimStock: parseFloat(((p.tanjimStock || 0) + qty).toFixed(1))
-                  })
-                });
-                // Update local cache so next iteration has correct values
-                p.stock = parseFloat((p.stock - qty).toFixed(1));
-                p.tanjimStock = parseFloat(((p.tanjimStock || 0) + qty).toFixed(1));
-                updated++;
-              } catch (e) {
-                errors.push(`${p.name}: ${e.message}`);
-              }
-            }
-
-            if (errors.length) {
-              showToast(errors[0], 'error');
-            } else if (updated > 0) {
-              showToast(`✓ ${updated} product(s) transferred to Tanjim`, 'success');
-              closeModal('tanjim-modal');
-              renderProducts();
-            } else {
-              showToast('No quantities entered', 'error');
-            }
-          }
-
-          // ═══════════════════════════════════════════════
-          //  BOTTLE TRACKER
-          // ═══════════════════════════════════════════════
-          async function renderBottles() {
-            const el = document.getElementById('main-content');
-
-            // Load bottles from localStorage (simple, no backend needed)
-            let bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
-
-            const totalBottles = bottles.reduce((s, b) => {
-              const obj = {};
-              (b.sizes || []).forEach(s2 => { obj[s2.size] = (obj[s2.size] || 0) + s2.qty; });
-              return s;
-            }, {});
-
-            // Build size summary
-            // Always read from running stock total
-            let sizeSummary = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
-            if (!sizeSummary) {
-              // Initialize from purchases if not yet set
-              sizeSummary = {};
-              bottles.forEach(b => {
-                (b.sizes || []).forEach(s => {
-                  sizeSummary[String(s.size)] = (sizeSummary[String(s.size)] || 0) + s.qty;
-                });
+            try {
+              // Only send the fields that need to change — avoid spreading entire object
+              await apiFetch(`/api/products/${p._id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                  stock: parseFloat((p.stock - qty).toFixed(1)),
+                  tanjimStock: parseFloat(((p.tanjimStock || 0) + qty).toFixed(1))
+                })
               });
-              localStorage.setItem('nafas_bottle_stock', JSON.stringify(sizeSummary));
+              // Update local cache so next iteration has correct values
+              p.stock = parseFloat((p.stock - qty).toFixed(1));
+              p.tanjimStock = parseFloat(((p.tanjimStock || 0) + qty).toFixed(1));
+              updated++;
+            } catch (e) {
+              errors.push(`${p.name}: ${e.message}`);
             }
+          }
 
-            el.innerHTML = `
+          if (errors.length) {
+            showToast(errors[0], 'error');
+          } else if (updated > 0) {
+            showToast(`✓ ${updated} product(s) transferred to Tanjim`, 'success');
+            closeModal('tanjim-modal');
+            renderProducts();
+          } else {
+            showToast('No quantities entered', 'error');
+          }
+        }
+
+        // ═══════════════════════════════════════════════
+        //  BOTTLE TRACKER
+        // ═══════════════════════════════════════════════
+        async function renderBottles() {
+          const el = document.getElementById('main-content');
+
+          // Load bottles from localStorage (simple, no backend needed)
+          let bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+
+          const totalBottles = bottles.reduce((s, b) => {
+            const obj = {};
+            (b.sizes || []).forEach(s2 => { obj[s2.size] = (obj[s2.size] || 0) + s2.qty; });
+            return s;
+          }, {});
+
+          // Build size summary
+          // Always read from running stock total
+          let sizeSummary = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
+          if (!sizeSummary) {
+            // Initialize from purchases if not yet set
+            sizeSummary = {};
+            bottles.forEach(b => {
+              (b.sizes || []).forEach(s => {
+                sizeSummary[String(s.size)] = (sizeSummary[String(s.size)] || 0) + s.qty;
+              });
+            });
+            localStorage.setItem('nafas_bottle_stock', JSON.stringify(sizeSummary));
+          }
+
+          el.innerHTML = `
     <div class="card">
       <div class="card-title">${icon('bottle')}Bottle Stock</div>
       ${Object.keys(sizeSummary).length === 0 ?
-                `<div class="empty-state" style="padding:1rem"><div class="empty-icon">🍶</div><div class="empty-text">No bottles added yet</div></div>` :
-                Object.entries(sizeSummary).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([size, qty]) => `
+              `<div class="empty-state" style="padding:1rem"><div class="empty-icon">🍶</div><div class="empty-text">No bottles added yet</div></div>` :
+              Object.entries(sizeSummary).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(([size, qty]) => `
           <div class="flex-between" style="padding:0.5rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
             <span style="font-size:0.9rem;font-weight:500">${size}ml bottle</span>
             <span class="item-stock ${qty <= 5 ? 'stock-low' : 'stock-ok'}">${qty} pcs</span>
           </div>
         `).join('')
-              }
+            }
     </div>
 
     <div class="card">
@@ -2914,8 +2919,8 @@
     <div class="card">
       <div class="card-title">${icon('history')}Purchase History</div>
       ${bottles.length === 0 ?
-                `<div class="empty-state" style="padding:1rem"><div class="empty-text">No purchases yet</div></div>` :
-                [...bottles].reverse().map((b, i) => `
+              `<div class="empty-state" style="padding:1rem"><div class="empty-text">No purchases yet</div></div>` :
+              [...bottles].reverse().map((b, i) => `
           <div style="padding:0.6rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
             <div class="flex-between">
               <div>
@@ -2929,88 +2934,88 @@
             </div>
           </div>
         `).join('')
-              }
+            }
     </div>
   `;
-          }
+        }
 
-          function addBottleSizeRow() {
-            const container = document.getElementById('bottle-sizes-list');
-            const row = document.createElement('div');
-            row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
-            row.innerHTML = `
+        function addBottleSizeRow() {
+          const container = document.getElementById('bottle-sizes-list');
+          const row = document.createElement('div');
+          row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+          row.innerHTML = `
     <select class="form-select bottle-size-sel" style="font-size:0.82rem">
       ${[3.5, 6, 12, 15, 20, 30, 50, 100].map(s => `<option value="${s}">${s}ml</option>`).join('')}
     </select>
     <input class="form-input bottle-qty-inp" type="number" value="10" min="1" placeholder="Qty" style="font-size:0.82rem"/>
     <button class="btn btn-danger btn-sm" onclick="this.closest('div').remove()">✕</button>
   `;
-            container.appendChild(row);
+          container.appendChild(row);
+        }
+
+        function saveBottlePurchase() {
+          const sizeEls = document.querySelectorAll('.bottle-size-sel');
+          const qtyEls = document.querySelectorAll('.bottle-qty-inp');
+          const sizes = [];
+          sizeEls.forEach((sel, i) => {
+            const qty = parseInt(qtyEls[i]?.value) || 0;
+            if (qty > 0) sizes.push({ size: parseFloat(sel.value), qty });
+          });
+          if (!sizes.length) return showToast('Add at least one bottle size', 'error');
+
+          const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+          bottles.push({
+            sizes,
+            cost: parseFloat(document.getElementById('bottle-cost').value) || 0,
+            note: document.getElementById('bottle-note').value || '',
+            date: new Date().toISOString()
+          });
+          localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
+          // Update running stock too
+          let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || '{}');
+          sizes.forEach(s => {
+            stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
+          });
+          localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
+
+          // Also record as a cost if cost entered
+          const cost = parseFloat(document.getElementById('bottle-cost').value) || 0;
+          if (cost > 0) {
+            apiFetch('/api/costs', {
+              method: 'POST',
+              body: JSON.stringify({
+                name: `Bottles (${sizes.map(s => `${s.qty}×${s.size}ml`).join(', ')})`,
+                amount: cost,
+                category: 'Packaging',
+                paidStatus: 'Paid'
+              })
+            }).catch(() => { });
           }
 
-          function saveBottlePurchase() {
-            const sizeEls = document.querySelectorAll('.bottle-size-sel');
-            const qtyEls = document.querySelectorAll('.bottle-qty-inp');
-            const sizes = [];
-            sizeEls.forEach((sel, i) => {
-              const qty = parseInt(qtyEls[i]?.value) || 0;
-              if (qty > 0) sizes.push({ size: parseFloat(sel.value), qty });
-            });
-            if (!sizes.length) return showToast('Add at least one bottle size', 'error');
+          showToast('✓ Bottle purchase saved', 'success');
+          renderBottles();
+        }
 
-            const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
-            bottles.push({
-              sizes,
-              cost: parseFloat(document.getElementById('bottle-cost').value) || 0,
-              note: document.getElementById('bottle-note').value || '',
-              date: new Date().toISOString()
-            });
-            localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
-            // Update running stock too
-            let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || '{}');
-            sizes.forEach(s => {
-              stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
-            });
-            localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
+        function deleteBottle(idx) {
+          const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+          bottles.splice(idx, 1);
+          localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
+          renderBottles();
+        }
 
-            // Also record as a cost if cost entered
-            const cost = parseFloat(document.getElementById('bottle-cost').value) || 0;
-            if (cost > 0) {
-              apiFetch('/api/costs', {
-                method: 'POST',
-                body: JSON.stringify({
-                  name: `Bottles (${sizes.map(s => `${s.qty}×${s.size}ml`).join(', ')})`,
-                  amount: cost,
-                  category: 'Packaging',
-                  paidStatus: 'Paid'
-                })
-              }).catch(() => { });
-            }
+        // ─── Combo ───
+        async function loadComboProductOptions() {
+          allProducts = await apiFetch('/api/products') || [];
+          const container = document.getElementById('combo-products-list');
+          container.innerHTML = '';
+          addComboProductRow();
+        }
 
-            showToast('✓ Bottle purchase saved', 'success');
-            renderBottles();
-          }
-
-          function deleteBottle(idx) {
-            const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
-            bottles.splice(idx, 1);
-            localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
-            renderBottles();
-          }
-
-          // ─── Combo ───
-          async function loadComboProductOptions() {
-            allProducts = await apiFetch('/api/products') || [];
-            const container = document.getElementById('combo-products-list');
-            container.innerHTML = '';
-            addComboProductRow();
-          }
-
-          function addComboProductRow() {
-            const container = document.getElementById('combo-products-list');
-            const row = document.createElement('div');
-            row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
-            row.innerHTML = `
+        function addComboProductRow() {
+          const container = document.getElementById('combo-products-list');
+          const row = document.createElement('div');
+          row.style = 'display:grid;grid-template-columns:1fr 80px auto;gap:0.5rem;margin-bottom:0.5rem;align-items:center';
+          row.innerHTML = `
     <select class="form-select" style="font-size:0.82rem">
       <option value="">Select product</option>
       ${allProducts.map(p => `<option value="${p._id}">${p.name}</option>`).join('')}
@@ -3018,51 +3023,51 @@
     <input class="form-input" type="number" value="3.5" placeholder="ml" style="font-size:0.82rem"/>
     <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>
   `;
-            container.appendChild(row);
-          }
+          container.appendChild(row);
+        }
 
-          async function saveCombo() {
-            const name = document.getElementById('c-name').value.trim();
-            const price = parseFloat(document.getElementById('c-price').value);
-            if (!name || !price) return showToast('Name and price required', 'error');
+        async function saveCombo() {
+          const name = document.getElementById('c-name').value.trim();
+          const price = parseFloat(document.getElementById('c-price').value);
+          if (!name || !price) return showToast('Name and price required', 'error');
 
-            const rows = document.getElementById('combo-products-list').querySelectorAll('div');
-            const products = [];
-            for (const row of rows) {
-              const sel = row.querySelector('select');
-              const inp = row.querySelector('input');
-              if (sel?.value && inp?.value) {
-                products.push({ productId: sel.value, quantity: parseFloat(inp.value) });
-              }
-            }
-            if (!products.length) return showToast('Add at least one product to combo', 'error');
-
-            try {
-              await apiFetch('/api/combos', { method: 'POST', body: JSON.stringify({ name, comboPrice: price, products }) });
-              showToast('Combo created ✓', 'success');
-              closeModal('combo-modal');
-              renderProducts();
-            } catch (err) {
-              showToast(err.message, 'error');
+          const rows = document.getElementById('combo-products-list').querySelectorAll('div');
+          const products = [];
+          for (const row of rows) {
+            const sel = row.querySelector('select');
+            const inp = row.querySelector('input');
+            if (sel?.value && inp?.value) {
+              products.push({ productId: sel.value, quantity: parseFloat(inp.value) });
             }
           }
+          if (!products.length) return showToast('Add at least one product to combo', 'error');
 
-          // ═══════════════════════════════════════════════
-          //  SALE HISTORY (Admin)
-          // ═══════════════════════════════════════════════
-          async function renderHistory() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+          try {
+            await apiFetch('/api/combos', { method: 'POST', body: JSON.stringify({ name, comboPrice: price, products }) });
+            showToast('Combo created ✓', 'success');
+            closeModal('combo-modal');
+            renderProducts();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
 
-            try {
-              const sales = await apiFetch('/api/sales');
-              if (!sales) return;
+        // ═══════════════════════════════════════════════
+        //  SALE HISTORY (Admin)
+        // ═══════════════════════════════════════════════
+        async function renderHistory() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
 
-              el.innerHTML = `
+          try {
+            const sales = await apiFetch('/api/sales');
+            if (!sales) return;
+
+            el.innerHTML = `
       <div class="card">
         <div class="card-title">${icon('history')}Sales History</div>
         ${sales.length === 0 ? `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-text">No sales yet</div></div>` :
-                  sales.map(s => `
+                sales.map(s => `
             <div class="sale-row">
               <div class="sale-row-top">
                 <div>
@@ -3086,48 +3091,48 @@
           `).join('')}
       </div>
     `;
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          async function deleteSale(id) {
-            if (!confirm('Delete this sale? Stock will be restored.')) return;
-            try {
-              await apiFetch(`/api/sales/${id}`, { method: 'DELETE' });
-              showToast('Sale deleted, stock restored', 'success');
-              renderHistory();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+        async function deleteSale(id) {
+          if (!confirm('Delete this sale? Stock will be restored.')) return;
+          try {
+            await apiFetch(`/api/sales/${id}`, { method: 'DELETE' });
+            showToast('Sale deleted, stock restored', 'success');
+            renderHistory();
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          // ═══════════════════════════════════════════════
-          //  COSTS (Admin)
-          // ═══════════════════════════════════════════════
-          async function renderCosts() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
-            try {
-              const costs = await apiFetch('/api/costs');
+        // ═══════════════════════════════════════════════
+        //  COSTS (Admin)
+        // ═══════════════════════════════════════════════
+        async function renderCosts() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+          try {
+            const costs = await apiFetch('/api/costs');
 
-              // Filter state
-              const fromVal = document.getElementById('cost-filter-from')?.value || '';
-              const toVal = document.getElementById('cost-filter-to')?.value || '';
-              const catVal = document.getElementById('cost-filter-cat')?.value || 'All';
+            // Filter state
+            const fromVal = document.getElementById('cost-filter-from')?.value || '';
+            const toVal = document.getElementById('cost-filter-to')?.value || '';
+            const catVal = document.getElementById('cost-filter-cat')?.value || 'All';
 
-              let filtered = costs;
-              if (fromVal) filtered = filtered.filter(c => new Date(c.date) >= new Date(fromVal));
-              if (toVal) filtered = filtered.filter(c => new Date(c.date) <= new Date(toVal + 'T23:59:59'));
-              if (catVal !== 'All') filtered = filtered.filter(c => c.category === catVal);
+            let filtered = costs;
+            if (fromVal) filtered = filtered.filter(c => new Date(c.date) >= new Date(fromVal));
+            if (toVal) filtered = filtered.filter(c => new Date(c.date) <= new Date(toVal + 'T23:59:59'));
+            if (catVal !== 'All') filtered = filtered.filter(c => c.category === catVal);
 
-              const total = filtered.reduce((s, c) => s + c.amount, 0);
-              const due = filtered.reduce((s, c) => s + (c.dueAmount || 0), 0);
+            const total = filtered.reduce((s, c) => s + c.amount, 0);
+            const due = filtered.reduce((s, c) => s + (c.dueAmount || 0), 0);
 
-              // Set today as default date for cost modal
-              const today = new Date().toISOString().split('T')[0];
+            // Set today as default date for cost modal
+            const today = new Date().toISOString().split('T')[0];
 
-              el.innerHTML = `
+            el.innerHTML = `
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-label">Total Costs</div>
@@ -3169,8 +3174,8 @@
 
       <div class="card">
         ${filtered.length === 0
-                  ? `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">No costs found</div></div>`
-                  : filtered.map(c => `
+                ? `<div class="empty-state"><div class="empty-icon">💸</div><div class="empty-text">No costs found</div></div>`
+                : filtered.map(c => `
             <div class="item-row">
               <div>
                 <div class="item-name">${c.name}</div>
@@ -3187,164 +3192,164 @@
       </div>
     `;
 
-              // Set default date on modal
-              setTimeout(() => {
-                const d = document.getElementById('cost-date');
-                if (d && !d.value) d.value = today;
-              }, 50);
+            // Set default date on modal
+            setTimeout(() => {
+              const d = document.getElementById('cost-date');
+              if (d && !d.value) d.value = today;
+            }, 50);
 
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          // Cost filter helpers
-          let _costCat = 'All';
-          function setCostCat(cat) {
-            _costCat = cat;
-            const el = document.getElementById('cost-filter-cat');
-            if (el) el.value = cat;
+        // Cost filter helpers
+        let _costCat = 'All';
+        function setCostCat(cat) {
+          _costCat = cat;
+          const el = document.getElementById('cost-filter-cat');
+          if (el) el.value = cat;
+          renderCosts();
+        }
+        function clearCostFilters() {
+          const from = document.getElementById('cost-filter-from');
+          const to = document.getElementById('cost-filter-to');
+          if (from) from.value = '';
+          if (to) to.value = '';
+          _costCat = 'All';
+          renderCosts();
+        }
+        function openCostModal() {
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('cost-date').value = today;
+          openModal('cost-modal');
+        }
+
+        async function saveCost() {
+          const body = {
+            name: document.getElementById('cost-name').value.trim(),
+            amount: parseFloat(document.getElementById('cost-amount').value) || 0,
+            category: document.getElementById('cost-cat').value,
+            paidStatus: document.getElementById('cost-status').value,
+            dueAmount: parseFloat(document.getElementById('cost-due').value) || 0,
+            notes: document.getElementById('cost-notes').value,
+            date: document.getElementById('cost-date').value || new Date().toISOString(),
+          };
+          if (!body.name || !body.amount) return showToast('Name and amount required', 'error');
+          try {
+            await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Cost recorded ✓', 'success');
+            // Reset form
+            ['cost-name', 'cost-notes'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('cost-amount').value = '';
+            document.getElementById('cost-due').value = '';
+            document.getElementById('cost-date').value = new Date().toISOString().split('T')[0];
+            closeModal('cost-modal');
             renderCosts();
+          } catch (err) {
+            showToast(err.message, 'error');
           }
-          function clearCostFilters() {
-            const from = document.getElementById('cost-filter-from');
-            const to = document.getElementById('cost-filter-to');
-            if (from) from.value = '';
-            if (to) to.value = '';
-            _costCat = 'All';
+        }
+
+        async function deleteCost(id) {
+          if (!confirm('Delete this cost entry?')) return;
+          try {
+            await apiFetch(`/api/costs/${id}`, { method: 'DELETE' });
+            showToast('Deleted', 'success');
             renderCosts();
+          } catch (err) {
+            showToast(err.message, 'error');
           }
-          function openCostModal() {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('cost-date').value = today;
-            openModal('cost-modal');
-          }
+        }
 
-          async function saveCost() {
-            const body = {
-              name: document.getElementById('cost-name').value.trim(),
-              amount: parseFloat(document.getElementById('cost-amount').value) || 0,
-              category: document.getElementById('cost-cat').value,
-              paidStatus: document.getElementById('cost-status').value,
-              dueAmount: parseFloat(document.getElementById('cost-due').value) || 0,
-              notes: document.getElementById('cost-notes').value,
-              date: document.getElementById('cost-date').value || new Date().toISOString(),
-            };
-            if (!body.name || !body.amount) return showToast('Name and amount required', 'error');
-            try {
-              await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(body) });
-              showToast('Cost recorded ✓', 'success');
-              // Reset form
-              ['cost-name', 'cost-notes'].forEach(id => document.getElementById(id).value = '');
-              document.getElementById('cost-amount').value = '';
-              document.getElementById('cost-due').value = '';
-              document.getElementById('cost-date').value = new Date().toISOString().split('T')[0];
-              closeModal('cost-modal');
-              renderCosts();
-            } catch (err) {
-              showToast(err.message, 'error');
+        // ═══════════════════════════════════════════════
+        //  DOWNLOAD — Excel + PDF
+        // ═══════════════════════════════════════════════
+        async function downloadData(format) {
+          showToast('Preparing download...', '');
+          try {
+            const [sales, costs, products] = await Promise.all([
+              apiFetch('/api/sales'),
+              apiFetch('/api/costs'),
+              apiFetch('/api/products'),
+            ]);
+
+            const totalRevenue = sales.reduce((s, x) => s + x.totalRevenue, 0);
+            const totalCosts = costs.reduce((s, x) => s + x.amount, 0);
+            const savings = totalRevenue - totalCosts;
+            const marketValue = products.reduce((s, p) =>
+              s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate), 0);
+
+            if (format === 'excel') {
+              downloadExcel(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
+            } else {
+              downloadPDF(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
             }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          async function deleteCost(id) {
-            if (!confirm('Delete this cost entry?')) return;
-            try {
-              await apiFetch(`/api/costs/${id}`, { method: 'DELETE' });
-              showToast('Deleted', 'success');
-              renderCosts();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-          }
+        function downloadExcel(sales, costs, products, summary) {
+          // Build CSV content (opens in Excel)
+          const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+          const esc = v => `"${String(v || '').replace(/"/g, '""')}"`;
 
-          // ═══════════════════════════════════════════════
-          //  DOWNLOAD — Excel + PDF
-          // ═══════════════════════════════════════════════
-          async function downloadData(format) {
-            showToast('Preparing download...', '');
-            try {
-              const [sales, costs, products] = await Promise.all([
-                apiFetch('/api/sales'),
-                apiFetch('/api/costs'),
-                apiFetch('/api/products'),
-              ]);
+          let csv = '';
 
-              const totalRevenue = sales.reduce((s, x) => s + x.totalRevenue, 0);
-              const totalCosts = costs.reduce((s, x) => s + x.amount, 0);
-              const savings = totalRevenue - totalCosts;
-              const marketValue = products.reduce((s, p) =>
-                s + (p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate), 0);
+          // ── Summary Sheet ──
+          csv += 'NAFAS BUSINESS SUMMARY\n';
+          csv += `Generated,${fmtDate(new Date())}\n\n`;
+          csv += `Total Revenue,৳${summary.totalRevenue.toLocaleString()}\n`;
+          csv += `Total Costs,৳${summary.totalCosts.toLocaleString()}\n`;
+          csv += `Savings (In Hand),৳${summary.savings.toLocaleString()}\n`;
+          csv += `Inventory Market Value,৳${Math.round(summary.marketValue).toLocaleString()}\n\n`;
 
-              if (format === 'excel') {
-                downloadExcel(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
-              } else {
-                downloadPDF(sales, costs, products, { totalRevenue, totalCosts, savings, marketValue });
-              }
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-          }
+          // ── Products ──
+          csv += '\nPRODUCTS\n';
+          csv += 'Name,Grade,Category,Stock,Unit,Purchase Rate/100ml,Selling Price/3.5ml,Market Value,Lot,Tanjim Stock\n';
+          products.forEach(p => {
+            const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+            csv += [esc(p.name), esc(p.grade || ''), esc(p.category), p.stock, p.unit,
+            p.purchaseRate, p.sellingPrice, Math.round(mv),
+            esc(p.lotInfo?.lotName || ''), p.tanjimStock || 0].join(',') + '\n';
+          });
 
-          function downloadExcel(sales, costs, products, summary) {
-            // Build CSV content (opens in Excel)
-            const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
-            const esc = v => `"${String(v || '').replace(/"/g, '""')}"`;
+          // ── Sales ──
+          csv += '\nSALES HISTORY\n';
+          csv += 'Date,Customer,Items,Store,Channel,Revenue,Extra Costs,Net Profit,Sold By\n';
+          sales.forEach(s => {
+            const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(' + ');
+            const ec = (s.extraCosts?.packaging || 0) + (s.extraCosts?.delivery || 0) + (s.extraCosts?.others || 0);
+            csv += [fmtDate(s.date), esc(s.customerName), esc(items),
+            s.store || 'Main', s.channel, s.totalRevenue, ec,
+            s.netProfit || 0, s.soldBy].join(',') + '\n';
+          });
 
-            let csv = '';
+          // ── Costs ──
+          csv += '\nCOSTS\n';
+          csv += 'Date,Name,Category,Amount,Status,Due Amount,Notes\n';
+          costs.forEach(c => {
+            csv += [fmtDate(c.date), esc(c.name), c.category, c.amount,
+            c.paidStatus, c.dueAmount || 0, esc(c.notes || '')].join(',') + '\n';
+          });
 
-            // ── Summary Sheet ──
-            csv += 'NAFAS BUSINESS SUMMARY\n';
-            csv += `Generated,${fmtDate(new Date())}\n\n`;
-            csv += `Total Revenue,৳${summary.totalRevenue.toLocaleString()}\n`;
-            csv += `Total Costs,৳${summary.totalCosts.toLocaleString()}\n`;
-            csv += `Savings (In Hand),৳${summary.savings.toLocaleString()}\n`;
-            csv += `Inventory Market Value,৳${Math.round(summary.marketValue).toLocaleString()}\n\n`;
+          // Download
+          const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `NAFAS_Report_${new Date().toISOString().split('T')[0]}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Excel file downloaded ✓', 'success');
+        }
 
-            // ── Products ──
-            csv += '\nPRODUCTS\n';
-            csv += 'Name,Grade,Category,Stock,Unit,Purchase Rate/100ml,Selling Price/3.5ml,Market Value,Lot,Tanjim Stock\n';
-            products.forEach(p => {
-              const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
-              csv += [esc(p.name), esc(p.grade || ''), esc(p.category), p.stock, p.unit,
-              p.purchaseRate, p.sellingPrice, Math.round(mv),
-              esc(p.lotInfo?.lotName || ''), p.tanjimStock || 0].join(',') + '\n';
-            });
+        function downloadPDF(sales, costs, products, summary) {
+          const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+          const today = fmtDate(new Date());
 
-            // ── Sales ──
-            csv += '\nSALES HISTORY\n';
-            csv += 'Date,Customer,Items,Store,Channel,Revenue,Extra Costs,Net Profit,Sold By\n';
-            sales.forEach(s => {
-              const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(' + ');
-              const ec = (s.extraCosts?.packaging || 0) + (s.extraCosts?.delivery || 0) + (s.extraCosts?.others || 0);
-              csv += [fmtDate(s.date), esc(s.customerName), esc(items),
-              s.store || 'Main', s.channel, s.totalRevenue, ec,
-              s.netProfit || 0, s.soldBy].join(',') + '\n';
-            });
-
-            // ── Costs ──
-            csv += '\nCOSTS\n';
-            csv += 'Date,Name,Category,Amount,Status,Due Amount,Notes\n';
-            costs.forEach(c => {
-              csv += [fmtDate(c.date), esc(c.name), c.category, c.amount,
-              c.paidStatus, c.dueAmount || 0, esc(c.notes || '')].join(',') + '\n';
-            });
-
-            // Download
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `NAFAS_Report_${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('Excel file downloaded ✓', 'success');
-          }
-
-          function downloadPDF(sales, costs, products, summary) {
-            const fmtDate = d => new Date(d).toLocaleDateString('en-BD', { day: 'numeric', month: 'short', year: 'numeric' });
-            const today = fmtDate(new Date());
-
-            const html = `<!DOCTYPE html>
+          const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
@@ -3425,8 +3430,8 @@
 <table>
   <tr><th>Name</th><th>Grade</th><th>Stock</th><th>Buy/100ml</th><th>Sell/3.5ml</th><th>Market Value</th><th>Tanjim</th><th>Lot</th></tr>
   ${products.map(p => {
-              const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
-              return `<tr>
+            const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
+            return `<tr>
       <td>${p.name}</td>
       <td>${p.grade || '—'}</td>
       <td class="${p.stock <= p.lowStockAlert ? 'danger' : ''}"><b>${p.stock}</b>${p.unit}</td>
@@ -3436,15 +3441,15 @@
       <td>${p.tanjimStock || 0}${p.unit}</td>
       <td><span class="tag">${p.lotInfo?.lotName || '—'}</span></td>
     </tr>`;
-            }).join('')}
+          }).join('')}
 </table>
 
 <h2>SALES HISTORY (${sales.length} sales)</h2>
 <table>
   <tr><th>Date</th><th>Customer</th><th>Items</th><th>Store</th><th>Revenue</th><th>Net Profit</th><th>By</th></tr>
   ${sales.map(s => {
-              const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(', ');
-              return `<tr>
+            const items = s.items.map(i => `${i.name} ${i.qty}ml`).join(', ');
+            return `<tr>
       <td>${fmtDate(s.date)}</td>
       <td>${s.customerName}</td>
       <td style="max-width:180px">${items}</td>
@@ -3453,7 +3458,7 @@
       <td class="success">৳${s.netProfit || 0}</td>
       <td>${s.soldBy}</td>
     </tr>`;
-            }).join('')}
+          }).join('')}
 </table>
 
 <h2>COSTS (${costs.length} entries)</h2>
@@ -3473,24 +3478,24 @@
 </body>
 </html>`;
 
-            const win = window.open('', '_blank');
-            win.document.write(html);
-            win.document.close();
-            setTimeout(() => win.print(), 600);
-            showToast('PDF ready — use Print → Save as PDF ✓', 'success');
-          }
+          const win = window.open('', '_blank');
+          win.document.write(html);
+          win.document.close();
+          setTimeout(() => win.print(), 600);
+          showToast('PDF ready — use Print → Save as PDF ✓', 'success');
+        }
 
-          // ═══════════════════════════════════════════════
-          //  STOCK VIEW (Assistant)
-          // ═══════════════════════════════════════════════
-          async function renderStockView() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
-            try {
-              const data = await apiFetch('/api/dashboard/assistant');
-              const low = data.products.filter(p => p.stock <= p.lowStockAlert);
+        // ═══════════════════════════════════════════════
+        //  STOCK VIEW (Assistant)
+        // ═══════════════════════════════════════════════
+        async function renderStockView() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+          try {
+            const data = await apiFetch('/api/dashboard/assistant');
+            const low = data.products.filter(p => p.stock <= p.lowStockAlert);
 
-              el.innerHTML = `
+            el.innerHTML = `
       ${low.length ? `<div class="alert-banner">⚠️ ${low.length} item(s) low on stock</div>` : ''}
       <div class="card">
         <div class="card-title">${icon('stock')}Current Stock</div>
@@ -3502,64 +3507,64 @@
         `).join('')}
       </div>
     `;
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          // ═══════════════════════════════════════════════
-          //  MODAL & TOAST HELPERS
-          // ═══════════════════════════════════════════════
-          function openModal(id) { document.getElementById(id).classList.add('open'); }
-          function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+        // ═══════════════════════════════════════════════
+        //  MODAL & TOAST HELPERS
+        // ═══════════════════════════════════════════════
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
-          // Close modal on overlay click
-          document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            overlay.addEventListener('click', (e) => {
-              if (e.target === overlay) overlay.classList.remove('open');
-            });
+        // Close modal on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+          overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.remove('open');
           });
+        });
 
-          let toastTimer;
-          function showToast(msg, type = '') {
-            const t = document.getElementById('toast');
+        let toastTimer;
+        function showToast(msg, type = '') {
+          const t = document.getElementById('toast');
+          t.classList.remove('show', 'success', 'error');
+          t.textContent = msg;
+          void t.offsetWidth; // force reflow
+          if (type) t.classList.add(type);
+          t.classList.add('show');
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => {
             t.classList.remove('show', 'success', 'error');
-            t.textContent = msg;
-            void t.offsetWidth; // force reflow
-            if (type) t.classList.add(type);
-            t.classList.add('show');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => {
-              t.classList.remove('show', 'success', 'error');
-            }, 2500);
-          }
+          }, 2500);
+        }
 
-          // ═══════════════════════════════════════════════
-          //  USERS MANAGEMENT (Admin only)
-          // ═══════════════════════════════════════════════
-          const ALL_PERMS = [
-            { key: 'viewDashboard', label: 'View Dashboard & Revenue' },
-            { key: 'viewStock', label: 'View Stock' },
-            { key: 'viewHistory', label: 'View Sale History' },
-            { key: 'sellMain', label: 'Record Sales (Main Store)' },
-            { key: 'sellBranch', label: 'Record Sales (Branch)' },
-            { key: 'addProducts', label: 'Add / Edit Products' },
-            { key: 'manageCosts', label: 'Manage Costs' },
-            { key: 'transferStock', label: 'Transfer Stock to Branch' },
-            { key: 'deleteSales', label: 'Delete Sales' },
-          ];
+        // ═══════════════════════════════════════════════
+        //  USERS MANAGEMENT (Admin only)
+        // ═══════════════════════════════════════════════
+        const ALL_PERMS = [
+          { key: 'viewDashboard', label: 'View Dashboard & Revenue' },
+          { key: 'viewStock', label: 'View Stock' },
+          { key: 'viewHistory', label: 'View Sale History' },
+          { key: 'sellMain', label: 'Record Sales (Main Store)' },
+          { key: 'sellBranch', label: 'Record Sales (Branch)' },
+          { key: 'addProducts', label: 'Add / Edit Products' },
+          { key: 'manageCosts', label: 'Manage Costs' },
+          { key: 'transferStock', label: 'Transfer Stock to Branch' },
+          { key: 'deleteSales', label: 'Delete Sales' },
+        ];
 
-          let editingUserId = null;
-          async function renderUsers() {
-            const el = document.getElementById('main-content');
-            el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
-            try {
-              const [users, branches] = await Promise.all([
-                apiFetch('/api/users'),
-                apiFetch('/api/branches')
-              ]);
+        let editingUserId = null;
+        async function renderUsers() {
+          const el = document.getElementById('main-content');
+          el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
+          try {
+            const [users, branches] = await Promise.all([
+              apiFetch('/api/users'),
+              apiFetch('/api/branches')
+            ]);
 
-              el.innerHTML = `
+            el.innerHTML = `
       <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openUserModal()">+ Add User</button>
         <button class="btn btn-outline btn-sm" onclick="openBranchModal()">+ Add Branch</button>
@@ -3588,9 +3593,9 @@
           <div class="empty-state">
             <div class="empty-text">No users yet.</div>
           </div>` :
-                  users.map(u => {
-                    const assignedBranch = branches.find(b => b._id === u.assignedBranch);
-                    return `
+                users.map(u => {
+                  const assignedBranch = branches.find(b => b._id === u.assignedBranch);
+                  return `
             <div class="item-row">
               <div style="flex:1">
                 <div class="item-name">
@@ -3604,8 +3609,8 @@
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.35rem">
                   ${ALL_PERMS.filter(p => u.permissions?.[p.key]).map(p =>
-                      `<span style="font-size:0.62rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.4rem;border-radius:4px">${p.label}</span>`
-                    ).join('')}
+                    `<span style="font-size:0.62rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.4rem;border-radius:4px">${p.label}</span>`
+                  ).join('')}
                 </div>
               </div>
               <div style="display:flex;gap:0.3rem;margin-left:0.5rem">
@@ -3613,8 +3618,8 @@
                 <button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}', '${u.name}')">Del</button>
               </div>
             </div>`;
-                  }).join('')
-                }
+                }).join('')
+              }
       </div>
 
       <div class="card">
@@ -3624,426 +3629,426 @@
         `).join('')}
       </div>
     `;
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
+          } catch (err) {
+            showToast(err.message, 'error');
           }
+        }
 
-          async function openUserModal(id = null) {
-            editingUserId = id;
-            document.getElementById('user-modal-title').textContent = id ? `Edit User` : 'Add New User';
-            document.getElementById('user-id-field').value = id || '';
+        async function openUserModal(id = null) {
+          editingUserId = id;
+          document.getElementById('user-modal-title').textContent = id ? `Edit User` : 'Add New User';
+          document.getElementById('user-id-field').value = id || '';
 
-            // Reset form
-            document.getElementById('u-name').value = '';
-            document.getElementById('u-pin').value = '';
-            document.getElementById('u-active').checked = true;
-            ALL_PERMS.forEach(p => {
-              const el = document.getElementById(`perm-${p.key}`);
-              if (el) el.checked = false;
-            });
-
-            if (id) {
-              // Load existing user data
-              try {
-                const users = await apiFetch('/api/users');
-                const u = users.find(x => x._id === id);
-                if (u) {
-                  document.getElementById('u-name').value = u.name;
-                  document.getElementById('u-active').checked = u.isActive;
-                  // Load branches and set assigned branch
-                  const branches = await apiFetch('/api/branches') || [];
-                  const branchSel = document.getElementById('u-branch');
-                  branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
-                    branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
-                  if (u.assignedBranch) branchSel.value = u.assignedBranch;
-                } else {
-                  ['u-name', 'u-pin'].forEach(id => document.getElementById(id).value = '');
-                  document.getElementById('u-grade').value = '';
-                  const branches = await apiFetch('/api/branches') || [];
-                  const branchSel = document.getElementById('u-branch');
-                  branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
-                    branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
-                  branchSel.value = '';
-                  ALL_PERMS.forEach(p => {
-                    const el = document.getElementById(`perm-${p.key}`);
-                    if (el) el.checked = !!(u.permissions?.[p.key]);
-                  });
-                }
-              } catch (e) { }
-            }
-            openModal('user-modal');
-          }
-
-          async function saveUser() {
-            const id = document.getElementById('user-id-field').value;
-            const name = document.getElementById('u-name').value.trim();
-            const pin = document.getElementById('u-pin').value.trim();
-            const isActive = document.getElementById('u-active').checked;
-
-            if (!name) return showToast('Name is required', 'error');
-            if (!id && !pin) return showToast('PIN is required for new user', 'error');
-            if (pin && pin.length !== 4) return showToast('PIN must be exactly 4 digits', 'error');
-            if (pin && !/^\d{4}$/.test(pin)) return showToast('PIN must be 4 numbers only', 'error');
-
-            const permissions = {};
-            ALL_PERMS.forEach(p => {
-              permissions[p.key] = !!(document.getElementById(`perm-${p.key}`)?.checked);
-            });
-
-            const body = {
-              name,
-              permissions,
-              isActive,
-              assignedBranch: document.getElementById('u-branch').value || null
-            };
-            if (pin) body.pin = pin;
-
-            try {
-              if (id) {
-                await apiFetch(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) });
-                showToast(`✓ ${name} updated`, 'success');
-              } else {
-                await apiFetch('/api/users', { method: 'POST', body: JSON.stringify({ ...body, pin }) });
-                showToast(`✓ ${name} added`, 'success');
-              }
-              closeModal('user-modal');
-              renderUsers();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-          }
-
-          async function deleteUser(id, name) {
-            if (!confirm(`Delete user "${name}"? They will lose access immediately.`)) return;
-            try {
-              await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
-              showToast(`${name} removed`, 'success');
-              renderUsers();
-            } catch (err) {
-              showToast(err.message, 'error');
-            }
-          }
-
-          // Quick permission presets
-          function applyPreset(preset) {
-            const presets = {
-              saleOnly: ['sellBranch', 'viewStock'],
-              fullSales: ['sellMain', 'sellBranch', 'viewStock', 'viewHistory'],
-              manager: ['viewDashboard', 'sellMain', 'sellBranch', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts', 'transferStock'],
-            };
-            ALL_PERMS.forEach(p => {
-              const el = document.getElementById(`perm-${p.key}`);
-              if (el) el.checked = (presets[preset] || []).includes(p.key);
-            });
-          }
-
-          // ═══════════════════════════════════════════════
-          //  BULK IMPORT
-          // ═══════════════════════════════════════════════
-          let importTab = 'products';
-
-          function openImportModal() {
-            importTab = 'products';
-            switchImportTab('products');
-            document.getElementById('imp-progress-wrap').style.display = 'none';
-            document.getElementById('imp-result').style.display = 'none';
-            document.getElementById('imp-submit-btn').disabled = false;
-            openModal('import-modal');
-          }
-
-          function switchImportTab(tab) {
-            importTab = tab;
-            ['products', 'sales', 'costs'].forEach(t => {
-              document.getElementById(`imp-${t}-panel`).style.display = t === tab ? 'block' : 'none';
-              document.getElementById(`imp-tab-${t}`).classList.toggle('active', t === tab);
-            });
-            document.getElementById('imp-result').style.display = 'none';
-          }
-
-          // ── Parse helpers ──
-          function parseProductLines(raw) {
-            const category = document.getElementById('imp-category').value;
-            const unit = document.getElementById('imp-unit').value;
-            const rows = [];
-            const errors = [];
-
-            raw.split('\n').forEach((line, i) => {
-              line = line.trim();
-              if (!line || line.startsWith('#')) return;
-              const parts = line.split(',').map(s => s.trim());
-              if (parts.length < 5) { errors.push(`Line ${i + 1}: needs at least 5 fields (Name, Grade, Stock, PurchaseRate, SellingPrice)`); return; }
-              const [name, grade, stockRaw, purchaseRaw, sellRaw, lotName] = parts;
-              const stock = parseFloat(stockRaw);
-              const purchaseRate = parseFloat(purchaseRaw);
-              const sellingPrice = parseFloat(sellRaw);
-              if (!name) { errors.push(`Line ${i + 1}: Name is empty`); return; }
-              if (isNaN(stock) || isNaN(purchaseRate) || isNaN(sellingPrice)) { errors.push(`Line ${i + 1}: Stock/Rate/Price must be numbers`); return; }
-              rows.push({ name, grade: grade || '', stock, purchaseRate, sellingPrice, unit, category, lotInfo: { lotName: lotName || '' }, lowStockAlert: unit === 'ml' ? 10 : 2 });
-            });
-            return { rows, errors };
-          }
-
-          function parseSaleLines(raw) {
-            const rows = [];
-            const errors = [];
-            raw.split('\n').forEach((line, i) => {
-              line = line.trim();
-              if (!line || line.startsWith('#')) return;
-              const parts = line.split(',').map(s => s.trim());
-              if (parts.length < 4) { errors.push(`Line ${i + 1}: needs CustomerName, ProductName, Qty, Amount`); return; }
-              const [customerName, productName, qtyRaw, amountRaw, dateRaw] = parts;
-              const qty = parseFloat(qtyRaw);
-              const amount = parseFloat(amountRaw);
-              if (isNaN(qty) || isNaN(amount)) { errors.push(`Line ${i + 1}: Qty and Amount must be numbers`); return; }
-              let date = new Date();
-              if (dateRaw) { const d = new Date(dateRaw); if (!isNaN(d)) date = d; }
-              rows.push({ customerName, productName, qty, amount, date });
-            });
-            return { rows, errors };
-          }
-
-          function parseCostLines(raw) {
-            const validCats = ['Raw', 'Packaging', 'Equipment', 'Food', 'Marketing', 'Other'];
-            const validStatus = ['Paid', 'Due', 'Partial'];
-            const rows = [];
-            const errors = [];
-            raw.split('\n').forEach((line, i) => {
-              line = line.trim();
-              if (!line || line.startsWith('#')) return;
-              const parts = line.split(',').map(s => s.trim());
-              if (parts.length < 2) { errors.push(`Line ${i + 1}: needs at least Name, Amount`); return; }
-              const [name, amountRaw, category, paidStatus] = parts;
-              const amount = parseFloat(amountRaw);
-              if (!name || isNaN(amount)) { errors.push(`Line ${i + 1}: Name and Amount required`); return; }
-              rows.push({
-                name, amount,
-                category: validCats.includes(category) ? category : 'Other',
-                paidStatus: validStatus.includes(paidStatus) ? paidStatus : 'Paid'
-              });
-            });
-            return { rows, errors };
-          }
-
-          // ── Show preview before importing ──
-          function showImportPreview(rows, errors, tab) {
-            const el = document.getElementById(`imp-${tab}-preview`);
-            if (!el) return;
-            let html = '';
-            if (errors.length) {
-              html += `<div style="background:rgba(224,82,82,0.1);border:1px solid rgba(224,82,82,0.3);border-radius:8px;padding:0.6rem;margin-bottom:0.5rem;font-size:0.75rem;color:var(--danger)">
-      ⚠️ ${errors.length} error(s):<br>${errors.slice(0, 5).join('<br>')}${errors.length > 5 ? `<br>...and ${errors.length - 5} more` : ''}</div>`;
-            }
-            if (rows.length) {
-              html += `<div style="background:rgba(82,192,122,0.08);border:1px solid rgba(82,192,122,0.2);border-radius:8px;padding:0.6rem;font-size:0.75rem;color:var(--success)">
-      ✓ ${rows.length} row(s) ready to import</div>`;
-            }
-            el.innerHTML = html;
-          }
-
-          // ── Live preview as user types ──
-          document.addEventListener('DOMContentLoaded', () => {
-            ['products', 'sales', 'costs'].forEach(tab => {
-              const el = document.getElementById(`imp-${tab}-text`);
-              if (el) el.addEventListener('input', () => {
-                if (importTab !== tab) return;
-                const raw = el.value;
-                if (tab === 'products') { const { rows, errors } = parseProductLines(raw); showImportPreview(rows, errors, tab); }
-                if (tab === 'sales') { const { rows, errors } = parseSaleLines(raw); showImportPreview(rows, errors, tab); }
-                if (tab === 'costs') { const { rows, errors } = parseCostLines(raw); showImportPreview(rows, errors, tab); }
-              });
-            });
+          // Reset form
+          document.getElementById('u-name').value = '';
+          document.getElementById('u-pin').value = '';
+          document.getElementById('u-active').checked = true;
+          ALL_PERMS.forEach(p => {
+            const el = document.getElementById(`perm-${p.key}`);
+            if (el) el.checked = false;
           });
 
-          // ── Run Import ──
-          async function runImport() {
-            const btn = document.getElementById('imp-submit-btn');
-            btn.disabled = true;
-
-            const progressWrap = document.getElementById('imp-progress-wrap');
-            const progressBar = document.getElementById('imp-progress-bar');
-            const progressLabel = document.getElementById('imp-progress-label');
-            const progressCount = document.getElementById('imp-progress-count');
-            const resultEl = document.getElementById('imp-result');
-            resultEl.style.display = 'none';
-
-            let rows = [], errors = [];
-
-            if (importTab === 'products') {
-              const raw = document.getElementById('imp-products-text').value;
-              ({ rows, errors } = parseProductLines(raw));
-            } else if (importTab === 'sales') {
-              const raw = document.getElementById('imp-sales-text').value;
-              ({ rows, errors } = parseSaleLines(raw));
-            } else if (importTab === 'costs') {
-              const raw = document.getElementById('imp-costs-text').value;
-              ({ rows, errors } = parseCostLines(raw));
-            }
-
-            if (errors.length && !rows.length) {
-              resultEl.style.display = 'block';
-              resultEl.style.background = 'rgba(224,82,82,0.1)';
-              resultEl.style.border = '1px solid rgba(224,82,82,0.3)';
-              resultEl.style.color = 'var(--danger)';
-              resultEl.innerHTML = `❌ Fix these errors first:<br>${errors.join('<br>')}`;
-              btn.disabled = false;
-              return;
-            }
-
-            if (!rows.length) {
-              showToast('Nothing to import — paste your data first', 'error');
-              btn.disabled = false;
-              return;
-            }
-
-            // Show progress
-            progressWrap.style.display = 'block';
-            progressBar.style.width = '0%';
-
-            let succeeded = 0, failed = 0, failedLines = [];
-
-            for (let i = 0; i < rows.length; i++) {
-              const row = rows[i];
-              progressLabel.textContent = `Importing ${importTab}...`;
-              progressCount.textContent = `${i + 1} / ${rows.length}`;
-              progressBar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
-
-              try {
-                if (importTab === 'products') {
-                  await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(row) });
-                } else if (importTab === 'sales') {
-                  // For historical sales, we post directly with a special flag (no stock deduction)
-                  // We find the product by name first
-                  const matchedProduct = allProducts.find(p => p.name.toLowerCase() === row.productName.toLowerCase());
-                  const body = {
-                    customerName: row.customerName,
-                    items: [{
-                      itemId: matchedProduct?._id || '000000000000000000000000',
-                      itemType: 'Product',
-                      qty: row.qty,
-                      overridePrice: row.amount / row.qty  // per unit price
-                    }],
-                    date: row.date,
-                    notes: 'Historical import',
-                    historicalImport: true  // backend can check this to skip stock deduction
-                  };
-                  await apiFetch('/api/sales/import', { method: 'POST', body: JSON.stringify(body) });
-                } else if (importTab === 'costs') {
-                  await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(row) });
-                }
-                succeeded++;
-              } catch (err) {
-                failed++;
-                failedLines.push(`Row ${i + 1} (${row.name || row.customerName || '?'}): ${err.message}`);
-              }
-
-              // Small delay to avoid hammering the server
-              await new Promise(r => setTimeout(r, 80));
-            }
-
-            progressBar.style.width = '100%';
-            progressLabel.textContent = 'Done!';
-
-            // Show result
-            resultEl.style.display = 'block';
-            if (failed === 0) {
-              resultEl.style.background = 'rgba(82,192,122,0.1)';
-              resultEl.style.border = '1px solid rgba(82,192,122,0.3)';
-              resultEl.style.color = 'var(--success)';
-              resultEl.innerHTML = `✅ Successfully imported <strong>${succeeded}</strong> ${importTab}!`;
-              showToast(`${succeeded} ${importTab} imported ✓`, 'success');
-              // Refresh the products list if we're on products tab
-              if (importTab === 'products') { allProducts = await apiFetch('/api/products') || []; }
-            } else {
-              resultEl.style.background = 'rgba(201,168,76,0.08)';
-              resultEl.style.border = '1px solid rgba(201,168,76,0.2)';
-              resultEl.style.color = 'var(--text)';
-              resultEl.innerHTML = `⚠️ ${succeeded} imported, ${failed} failed:<br><span style="font-size:0.72rem;color:var(--danger)">${failedLines.slice(0, 5).join('<br>')}</span>`;
-            }
-
-            btn.disabled = false;
-          }
-
-          // ═══════════════════════════════════════════════
-          //  AUTO-LOGIN if token exists
-          // ═══════════════════════════════════════════════
-          if (token && role) {
-            // Verify token is still valid
-            fetch('/api/dashboard/assistant', {
-              headers: { 'Authorization': `Bearer ${token}` }
-            }).then(r => {
-              if (r.ok) initApp();
-              else logout();
-            }).catch(() => logout());
-          }
-
-          // ═══════════════════════════════════════════════
-          //  SVG ICON LIBRARY — Minimal Line Style
-          // ═══════════════════════════════════════════════
-          const ICONS = {
-            dashboard: `<svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
-            sale: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
-            products: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
-            history: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
-            costs: `<svg viewBox="0 0 24 24" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
-            users: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
-            stock: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>`,
-            tanjim: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
-            bottle: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M9 2h6v4l2 3v11a2 2 0 01-2 2H9a2 2 0 01-2-2V9l2-3V2z"/><line x1="7" y1="13" x2="17" y2="13"/></svg>`,
-            summary: `<svg viewBox="0 0 24 24" width="13" height="13"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
-            selling: `<svg viewBox="0 0 24 24" width="13" height="13"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
-            warning: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-            download: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
-            filter: `<svg viewBox="0 0 24 24" width="13" height="13"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`,
-            savings: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v6l4 2"/></svg>`,
-            market: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-            guide: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-            topSell: `<svg viewBox="0 0 24 24" width="13" height="13"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
-            recent: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-            customer: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-            cart: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>`,
-          };
-
-          function icon(name, type = 'section') {
-            return `<span class="${type}-icon">${ICONS[name] || ICONS.guide}</span>`;
-          }
-
-          //bottle update
-          function deductBottlesAfterSale(cartItems) {
-            // Get current stock — initialize from purchase history if first time
-            let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
-
-            if (!stock) {
-              // Build stock from purchase history
-              const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
-              stock = {};
-              bottles.forEach(b => {
-                (b.sizes || []).forEach(s => {
-                  stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
+          if (id) {
+            // Load existing user data
+            try {
+              const users = await apiFetch('/api/users');
+              const u = users.find(x => x._id === id);
+              if (u) {
+                document.getElementById('u-name').value = u.name;
+                document.getElementById('u-active').checked = u.isActive;
+                // Load branches and set assigned branch
+                const branches = await apiFetch('/api/branches') || [];
+                const branchSel = document.getElementById('u-branch');
+                branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
+                  branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
+                if (u.assignedBranch) branchSel.value = u.assignedBranch;
+              } else {
+                ['u-name', 'u-pin'].forEach(id => document.getElementById(id).value = '');
+                document.getElementById('u-grade').value = '';
+                const branches = await apiFetch('/api/branches') || [];
+                const branchSel = document.getElementById('u-branch');
+                branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
+                  branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
+                branchSel.value = '';
+                ALL_PERMS.forEach(p => {
+                  const el = document.getElementById(`perm-${p.key}`);
+                  if (el) el.checked = !!(u.permissions?.[p.key]);
                 });
-              });
-            }
-
-            // Deduct one bottle per product item sold based on qty
-            cartItems.forEach(item => {
-              if (item.itemType !== 'Product') return;
-              const qty = parseFloat(item.qty);
-              // Match to nearest standard bottle size
-              const sizes = [3.5, 6, 12, 15, 20, 30, 50, 100];
-              let matchSize = sizes.reduce((prev, curr) =>
-                Math.abs(curr - qty) < Math.abs(prev - qty) ? curr : prev
-              );
-              const key = String(matchSize);
-              if (stock[key] && stock[key] > 0) {
-                stock[key] = Math.max(0, stock[key] - 1);
               }
-            });
+            } catch (e) { }
+          }
+          openModal('user-modal');
+        }
 
-            localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
-            console.log('Bottle stock after sale:', stock); // debug
+        async function saveUser() {
+          const id = document.getElementById('user-id-field').value;
+          const name = document.getElementById('u-name').value.trim();
+          const pin = document.getElementById('u-pin').value.trim();
+          const isActive = document.getElementById('u-active').checked;
+
+          if (!name) return showToast('Name is required', 'error');
+          if (!id && !pin) return showToast('PIN is required for new user', 'error');
+          if (pin && pin.length !== 4) return showToast('PIN must be exactly 4 digits', 'error');
+          if (pin && !/^\d{4}$/.test(pin)) return showToast('PIN must be 4 numbers only', 'error');
+
+          const permissions = {};
+          ALL_PERMS.forEach(p => {
+            permissions[p.key] = !!(document.getElementById(`perm-${p.key}`)?.checked);
+          });
+
+          const body = {
+            name,
+            permissions,
+            isActive,
+            assignedBranch: document.getElementById('u-branch').value || null
+          };
+          if (pin) body.pin = pin;
+
+          try {
+            if (id) {
+              await apiFetch(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+              showToast(`✓ ${name} updated`, 'success');
+            } else {
+              await apiFetch('/api/users', { method: 'POST', body: JSON.stringify({ ...body, pin }) });
+              showToast(`✓ ${name} added`, 'success');
+            }
+            closeModal('user-modal');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        async function deleteUser(id, name) {
+          if (!confirm(`Delete user "${name}"? They will lose access immediately.`)) return;
+          try {
+            await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+            showToast(`${name} removed`, 'success');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        // Quick permission presets
+        function applyPreset(preset) {
+          const presets = {
+            saleOnly: ['sellBranch', 'viewStock'],
+            fullSales: ['sellMain', 'sellBranch', 'viewStock', 'viewHistory'],
+            manager: ['viewDashboard', 'sellMain', 'sellBranch', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts', 'transferStock'],
+          };
+          ALL_PERMS.forEach(p => {
+            const el = document.getElementById(`perm-${p.key}`);
+            if (el) el.checked = (presets[preset] || []).includes(p.key);
+          });
+        }
+
+        // ═══════════════════════════════════════════════
+        //  BULK IMPORT
+        // ═══════════════════════════════════════════════
+        let importTab = 'products';
+
+        function openImportModal() {
+          importTab = 'products';
+          switchImportTab('products');
+          document.getElementById('imp-progress-wrap').style.display = 'none';
+          document.getElementById('imp-result').style.display = 'none';
+          document.getElementById('imp-submit-btn').disabled = false;
+          openModal('import-modal');
+        }
+
+        function switchImportTab(tab) {
+          importTab = tab;
+          ['products', 'sales', 'costs'].forEach(t => {
+            document.getElementById(`imp-${t}-panel`).style.display = t === tab ? 'block' : 'none';
+            document.getElementById(`imp-tab-${t}`).classList.toggle('active', t === tab);
+          });
+          document.getElementById('imp-result').style.display = 'none';
+        }
+
+        // ── Parse helpers ──
+        function parseProductLines(raw) {
+          const category = document.getElementById('imp-category').value;
+          const unit = document.getElementById('imp-unit').value;
+          const rows = [];
+          const errors = [];
+
+          raw.split('\n').forEach((line, i) => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const parts = line.split(',').map(s => s.trim());
+            if (parts.length < 5) { errors.push(`Line ${i + 1}: needs at least 5 fields (Name, Grade, Stock, PurchaseRate, SellingPrice)`); return; }
+            const [name, grade, stockRaw, purchaseRaw, sellRaw, lotName] = parts;
+            const stock = parseFloat(stockRaw);
+            const purchaseRate = parseFloat(purchaseRaw);
+            const sellingPrice = parseFloat(sellRaw);
+            if (!name) { errors.push(`Line ${i + 1}: Name is empty`); return; }
+            if (isNaN(stock) || isNaN(purchaseRate) || isNaN(sellingPrice)) { errors.push(`Line ${i + 1}: Stock/Rate/Price must be numbers`); return; }
+            rows.push({ name, grade: grade || '', stock, purchaseRate, sellingPrice, unit, category, lotInfo: { lotName: lotName || '' }, lowStockAlert: unit === 'ml' ? 10 : 2 });
+          });
+          return { rows, errors };
+        }
+
+        function parseSaleLines(raw) {
+          const rows = [];
+          const errors = [];
+          raw.split('\n').forEach((line, i) => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const parts = line.split(',').map(s => s.trim());
+            if (parts.length < 4) { errors.push(`Line ${i + 1}: needs CustomerName, ProductName, Qty, Amount`); return; }
+            const [customerName, productName, qtyRaw, amountRaw, dateRaw] = parts;
+            const qty = parseFloat(qtyRaw);
+            const amount = parseFloat(amountRaw);
+            if (isNaN(qty) || isNaN(amount)) { errors.push(`Line ${i + 1}: Qty and Amount must be numbers`); return; }
+            let date = new Date();
+            if (dateRaw) { const d = new Date(dateRaw); if (!isNaN(d)) date = d; }
+            rows.push({ customerName, productName, qty, amount, date });
+          });
+          return { rows, errors };
+        }
+
+        function parseCostLines(raw) {
+          const validCats = ['Raw', 'Packaging', 'Equipment', 'Food', 'Marketing', 'Other'];
+          const validStatus = ['Paid', 'Due', 'Partial'];
+          const rows = [];
+          const errors = [];
+          raw.split('\n').forEach((line, i) => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            const parts = line.split(',').map(s => s.trim());
+            if (parts.length < 2) { errors.push(`Line ${i + 1}: needs at least Name, Amount`); return; }
+            const [name, amountRaw, category, paidStatus] = parts;
+            const amount = parseFloat(amountRaw);
+            if (!name || isNaN(amount)) { errors.push(`Line ${i + 1}: Name and Amount required`); return; }
+            rows.push({
+              name, amount,
+              category: validCats.includes(category) ? category : 'Other',
+              paidStatus: validStatus.includes(paidStatus) ? paidStatus : 'Paid'
+            });
+          });
+          return { rows, errors };
+        }
+
+        // ── Show preview before importing ──
+        function showImportPreview(rows, errors, tab) {
+          const el = document.getElementById(`imp-${tab}-preview`);
+          if (!el) return;
+          let html = '';
+          if (errors.length) {
+            html += `<div style="background:rgba(224,82,82,0.1);border:1px solid rgba(224,82,82,0.3);border-radius:8px;padding:0.6rem;margin-bottom:0.5rem;font-size:0.75rem;color:var(--danger)">
+      ⚠️ ${errors.length} error(s):<br>${errors.slice(0, 5).join('<br>')}${errors.length > 5 ? `<br>...and ${errors.length - 5} more` : ''}</div>`;
+          }
+          if (rows.length) {
+            html += `<div style="background:rgba(82,192,122,0.08);border:1px solid rgba(82,192,122,0.2);border-radius:8px;padding:0.6rem;font-size:0.75rem;color:var(--success)">
+      ✓ ${rows.length} row(s) ready to import</div>`;
+          }
+          el.innerHTML = html;
+        }
+
+        // ── Live preview as user types ──
+        document.addEventListener('DOMContentLoaded', () => {
+          ['products', 'sales', 'costs'].forEach(tab => {
+            const el = document.getElementById(`imp-${tab}-text`);
+            if (el) el.addEventListener('input', () => {
+              if (importTab !== tab) return;
+              const raw = el.value;
+              if (tab === 'products') { const { rows, errors } = parseProductLines(raw); showImportPreview(rows, errors, tab); }
+              if (tab === 'sales') { const { rows, errors } = parseSaleLines(raw); showImportPreview(rows, errors, tab); }
+              if (tab === 'costs') { const { rows, errors } = parseCostLines(raw); showImportPreview(rows, errors, tab); }
+            });
+          });
+        });
+
+        // ── Run Import ──
+        async function runImport() {
+          const btn = document.getElementById('imp-submit-btn');
+          btn.disabled = true;
+
+          const progressWrap = document.getElementById('imp-progress-wrap');
+          const progressBar = document.getElementById('imp-progress-bar');
+          const progressLabel = document.getElementById('imp-progress-label');
+          const progressCount = document.getElementById('imp-progress-count');
+          const resultEl = document.getElementById('imp-result');
+          resultEl.style.display = 'none';
+
+          let rows = [], errors = [];
+
+          if (importTab === 'products') {
+            const raw = document.getElementById('imp-products-text').value;
+            ({ rows, errors } = parseProductLines(raw));
+          } else if (importTab === 'sales') {
+            const raw = document.getElementById('imp-sales-text').value;
+            ({ rows, errors } = parseSaleLines(raw));
+          } else if (importTab === 'costs') {
+            const raw = document.getElementById('imp-costs-text').value;
+            ({ rows, errors } = parseCostLines(raw));
           }
 
-        </script>
+          if (errors.length && !rows.length) {
+            resultEl.style.display = 'block';
+            resultEl.style.background = 'rgba(224,82,82,0.1)';
+            resultEl.style.border = '1px solid rgba(224,82,82,0.3)';
+            resultEl.style.color = 'var(--danger)';
+            resultEl.innerHTML = `❌ Fix these errors first:<br>${errors.join('<br>')}`;
+            btn.disabled = false;
+            return;
+          }
+
+          if (!rows.length) {
+            showToast('Nothing to import — paste your data first', 'error');
+            btn.disabled = false;
+            return;
+          }
+
+          // Show progress
+          progressWrap.style.display = 'block';
+          progressBar.style.width = '0%';
+
+          let succeeded = 0, failed = 0, failedLines = [];
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            progressLabel.textContent = `Importing ${importTab}...`;
+            progressCount.textContent = `${i + 1} / ${rows.length}`;
+            progressBar.style.width = `${Math.round(((i + 1) / rows.length) * 100)}%`;
+
+            try {
+              if (importTab === 'products') {
+                await apiFetch('/api/products', { method: 'POST', body: JSON.stringify(row) });
+              } else if (importTab === 'sales') {
+                // For historical sales, we post directly with a special flag (no stock deduction)
+                // We find the product by name first
+                const matchedProduct = allProducts.find(p => p.name.toLowerCase() === row.productName.toLowerCase());
+                const body = {
+                  customerName: row.customerName,
+                  items: [{
+                    itemId: matchedProduct?._id || '000000000000000000000000',
+                    itemType: 'Product',
+                    qty: row.qty,
+                    overridePrice: row.amount / row.qty  // per unit price
+                  }],
+                  date: row.date,
+                  notes: 'Historical import',
+                  historicalImport: true  // backend can check this to skip stock deduction
+                };
+                await apiFetch('/api/sales/import', { method: 'POST', body: JSON.stringify(body) });
+              } else if (importTab === 'costs') {
+                await apiFetch('/api/costs', { method: 'POST', body: JSON.stringify(row) });
+              }
+              succeeded++;
+            } catch (err) {
+              failed++;
+              failedLines.push(`Row ${i + 1} (${row.name || row.customerName || '?'}): ${err.message}`);
+            }
+
+            // Small delay to avoid hammering the server
+            await new Promise(r => setTimeout(r, 80));
+          }
+
+          progressBar.style.width = '100%';
+          progressLabel.textContent = 'Done!';
+
+          // Show result
+          resultEl.style.display = 'block';
+          if (failed === 0) {
+            resultEl.style.background = 'rgba(82,192,122,0.1)';
+            resultEl.style.border = '1px solid rgba(82,192,122,0.3)';
+            resultEl.style.color = 'var(--success)';
+            resultEl.innerHTML = `✅ Successfully imported <strong>${succeeded}</strong> ${importTab}!`;
+            showToast(`${succeeded} ${importTab} imported ✓`, 'success');
+            // Refresh the products list if we're on products tab
+            if (importTab === 'products') { allProducts = await apiFetch('/api/products') || []; }
+          } else {
+            resultEl.style.background = 'rgba(201,168,76,0.08)';
+            resultEl.style.border = '1px solid rgba(201,168,76,0.2)';
+            resultEl.style.color = 'var(--text)';
+            resultEl.innerHTML = `⚠️ ${succeeded} imported, ${failed} failed:<br><span style="font-size:0.72rem;color:var(--danger)">${failedLines.slice(0, 5).join('<br>')}</span>`;
+          }
+
+          btn.disabled = false;
+        }
+
+        // ═══════════════════════════════════════════════
+        //  AUTO-LOGIN if token exists
+        // ═══════════════════════════════════════════════
+        if (token && role) {
+          // Verify token is still valid
+          fetch('/api/dashboard/assistant', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }).then(r => {
+            if (r.ok) initApp();
+            else logout();
+          }).catch(() => logout());
+        }
+
+        // ═══════════════════════════════════════════════
+        //  SVG ICON LIBRARY — Minimal Line Style
+        // ═══════════════════════════════════════════════
+        const ICONS = {
+          dashboard: `<svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+          sale: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
+          products: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`,
+          history: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
+          costs: `<svg viewBox="0 0 24 24" width="20" height="20"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+          users: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+          stock: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>`,
+          tanjim: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>`,
+          bottle: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M9 2h6v4l2 3v11a2 2 0 01-2 2H9a2 2 0 01-2-2V9l2-3V2z"/><line x1="7" y1="13" x2="17" y2="13"/></svg>`,
+          summary: `<svg viewBox="0 0 24 24" width="13" height="13"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+          selling: `<svg viewBox="0 0 24 24" width="13" height="13"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`,
+          warning: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+          download: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+          filter: `<svg viewBox="0 0 24 24" width="13" height="13"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`,
+          savings: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v6l4 2"/></svg>`,
+          market: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+          guide: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+          topSell: `<svg viewBox="0 0 24 24" width="13" height="13"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+          recent: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+          customer: `<svg viewBox="0 0 24 24" width="13" height="13"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+          cart: `<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>`,
+        };
+
+        function icon(name, type = 'section') {
+          return `<span class="${type}-icon">${ICONS[name] || ICONS.guide}</span>`;
+        }
+
+        //bottle update
+        function deductBottlesAfterSale(cartItems) {
+          // Get current stock — initialize from purchase history if first time
+          let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
+
+          if (!stock) {
+            // Build stock from purchase history
+            const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+            stock = {};
+            bottles.forEach(b => {
+              (b.sizes || []).forEach(s => {
+                stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
+              });
+            });
+          }
+
+          // Deduct one bottle per product item sold based on qty
+          cartItems.forEach(item => {
+            if (item.itemType !== 'Product') return;
+            const qty = parseFloat(item.qty);
+            // Match to nearest standard bottle size
+            const sizes = [3.5, 6, 12, 15, 20, 30, 50, 100];
+            let matchSize = sizes.reduce((prev, curr) =>
+              Math.abs(curr - qty) < Math.abs(prev - qty) ? curr : prev
+            );
+            const key = String(matchSize);
+            if (stock[key] && stock[key] > 0) {
+              stock[key] = Math.max(0, stock[key] - 1);
+            }
+          });
+
+          localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
+          console.log('Bottle stock after sale:', stock); // debug
+        }
+
+      </script>
 </body>
 
 </html>
