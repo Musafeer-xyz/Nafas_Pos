@@ -7,7 +7,7 @@ exports.getAll = async (req, res) => {
     let filter = { isActive: true };
     if (category) filter.category = category;
     if (lowStock === 'true') filter.$expr = { $lte: ['$stock', '$lowStockAlert'] };
-    
+
     const products = await Product.find(filter).sort({ name: 1 });
     res.json(products);
   } catch (err) {
@@ -40,7 +40,11 @@ exports.create = async (req, res) => {
 // PUT update product
 exports.update = async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { $set: req.body },  // use $set to only update provided fields
+      { new: true, runValidators: false }
+    );
     if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (err) {
@@ -54,7 +58,7 @@ exports.adjustStock = async (req, res) => {
     const { amount, reason } = req.body; // amount can be + or -
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
-    
+
     product.stock += Number(amount);
     if (product.stock < 0) product.stock = 0;
     await product.save();

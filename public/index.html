@@ -2595,15 +2595,17 @@
         if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
 
         try {
-          // Deduct from main stock, add to tanjimStock
+          // Only send the fields that need to change — avoid spreading entire object
           await apiFetch(`/api/products/${p._id}`, {
             method: 'PUT',
             body: JSON.stringify({
-              ...p,
-              stock: p.stock - qty,
-              tanjimStock: (p.tanjimStock || 0) + qty
+              stock: parseFloat((p.stock - qty).toFixed(1)),
+              tanjimStock: parseFloat(((p.tanjimStock || 0) + qty).toFixed(1))
             })
           });
+          // Update local cache so next iteration has correct values
+          p.stock = parseFloat((p.stock - qty).toFixed(1));
+          p.tanjimStock = parseFloat(((p.tanjimStock || 0) + qty).toFixed(1));
           updated++;
         } catch (e) {
           errors.push(`${p.name}: ${e.message}`);
@@ -2612,10 +2614,12 @@
 
       if (errors.length) {
         showToast(errors[0], 'error');
-      } else {
-        showToast(`✓ Updated ${updated} product(s) for Tanjim`, 'success');
+      } else if (updated > 0) {
+        showToast(`✓ ${updated} product(s) transferred to Tanjim`, 'success');
         closeModal('tanjim-modal');
         renderProducts();
+      } else {
+        showToast('No quantities entered', 'error');
       }
     }
 
