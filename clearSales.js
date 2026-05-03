@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Sale = require('./models/Sale'); // তোমার Sale মডেল
+const Sale = mongoose.models.Sale || require('./models/Sale');
 
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
