@@ -1861,6 +1861,11 @@
     <div class="loading-center"><div class="spinner"></div></div>
   `;
       try {
+        const [data, products, allTimeData] = await Promise.all([
+          apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
+          apiFetch('/api/products'),
+          apiFetch('/api/dashboard/stats?period=all')  // always all time for savings
+        ]);
         const [data, products] = await Promise.all([
           apiFetch(`/api/dashboard/stats?period=${dashPeriod}`),
           apiFetch('/api/products')
@@ -1876,7 +1881,7 @@
         }, 0);
 
         // Savings = Revenue - All operational costs
-        const savings = data.totalRevenue - data.totalExtraCosts;
+        const savings = allTimeData.totalRevenue - allTimeData.totalExtraCosts;
 
         // Tanjim stock summary
         const tanjimProducts = products.filter(p => (p.tanjimStock || 0) > 0);
@@ -2346,18 +2351,13 @@
         notes: document.getElementById('sale-notes').value,
         store: activeSaleStore,
         date: document.getElementById('sale-date').value || new Date().toISOString(),
-        items: cart.map(i => {
-          // Calculate the correct per-unit price for this qty
-          const totalPrice = i.perMlPrice ? i.perMlPrice * i.qty : i.unitPrice;
-          const perUnitPrice = parseFloat((totalPrice / i.qty).toFixed(2));
-          return {
-            itemId: i.itemId,
-            itemType: i.itemType,
-            qty: parseFloat(i.qty),
-            // Always send overridePrice as per-unit so backend does qty × overridePrice correctly
-            overridePrice: perUnitPrice
-          };
-        }),
+        items: cart.map(i => ({
+          itemId: i.itemId,
+          itemType: i.itemType,
+          qty: parseFloat(i.qty),
+          // Send original 3.5ml price as override — backend uses: overridePrice × qty/3.5
+          overridePrice: i.originalPrice  // always the 3.5ml base price
+        })),
         extraCosts: {
           packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
           delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
@@ -2638,19 +2638,17 @@
       }, {});
 
       // Build size summary
-      // Read current stock from running total (updated after each sale)
-      const savedStock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
-      let sizeSummary = {};
-
-      if (savedStock) {
-        sizeSummary = savedStock;
-      } else {
-        // First time - calculate from purchase history
+      // Always read from running stock total
+      let sizeSummary = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
+      if (!sizeSummary) {
+        // Initialize from purchases if not yet set
+        sizeSummary = {};
         bottles.forEach(b => {
           (b.sizes || []).forEach(s => {
             sizeSummary[s.size] = (sizeSummary[s.size] || 0) + s.qty;
           });
         });
+        localStorage.setItem('nafas_bottle_stock', JSON.stringify(sizeSummary));
       }
 
       el.innerHTML = `
@@ -2746,6 +2744,12 @@
         date: new Date().toISOString()
       });
       localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
+      // Update running stock too
+      let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || '{}');
+      sizes.forEach(s => {
+        stock[s.size] = (stock[s.size] || 0) + s.qty;
+      });
+      localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
 
       // Also record as a cost if cost entered
       const cost = parseFloat(document.getElementById('bottle-cost').value) || 0;
@@ -3740,39 +3744,36 @@
 
     //bottle update
     function deductBottlesAfterSale(cartItems) {
-      const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+      // Get current stock — initialize from purchase history if first time
+      let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
 
-      // Build current bottle stock summary
-      const stock = {};
-      bottles.forEach(b => {
-        (b.sizes || []).forEach(s => {
-          stock[s.size] = (stock[s.size] || 0) + s.qty;
+      if (!stock) {
+        // Build stock from purchase history
+        const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+        stock = {};
+        bottles.forEach(b => {
+          (b.sizes || []).forEach(s => {
+            stock[s.size] = (stock[s.size] || 0) + s.qty;
+          });
         });
-      });
+      }
 
-      // For each product sold, deduct the closest bottle size
+      // Deduct one bottle per product item sold based on qty
       cartItems.forEach(item => {
         if (item.itemType !== 'Product') return;
         const qty = parseFloat(item.qty);
-        // Find matching bottle size (3.5, 6, 12, 15 etc.)
+        // Match to nearest standard bottle size
         const sizes = [3.5, 6, 12, 15, 20, 30, 50, 100];
-        const matchSize = sizes.find(s => Math.abs(s - qty) < 0.1);
-        if (matchSize && stock[matchSize] > 0) {
-          stock[matchSize]--;
+        let matchSize = sizes.reduce((prev, curr) =>
+          Math.abs(curr - qty) < Math.abs(prev - qty) ? curr : prev
+        );
+        if (stock[matchSize] && stock[matchSize] > 0) {
+          stock[matchSize] = Math.max(0, stock[matchSize] - 1);
         }
       });
 
-      // Save back as a new stock-correction entry
-      const corrected = bottles.map(b => ({
-        ...b,
-        sizes: (b.sizes || []).map(s => ({
-          ...s,
-          qty: Math.max(0, stock[s.size] !== undefined ? stock[s.size] : s.qty)
-        }))
-      }));
-
-      // Simpler approach - store running stock separately
       localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
+      console.log('Bottle stock after sale:', stock); // debug
     }
 
   </script>

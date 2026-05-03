@@ -37,15 +37,18 @@ exports.create = async (req, res) => {
         }
         await product.save({ session });
 
-        const unitPrice = item.overridePrice ?? product.sellingPrice;
-        totalRevenue += unitPrice * item.qty;
+        // overridePrice is the 3.5ml base price, so calculate per-ml then × actual qty
+        const basePer35 = item.overridePrice ?? product.sellingPrice;
+        const perMl = basePer35 / 3.5;
+        const unitPrice = parseFloat((perMl * item.qty).toFixed(2));
+        totalRevenue += unitPrice;
 
         processedItems.push({
           itemId: product._id,
           itemType: 'Product',
           name: product.name,
           qty: item.qty,
-          unitPrice,
+          unitPrice: parseFloat((perMl * item.qty).toFixed(2)),
           originalPrice: product.sellingPrice,
           isOverridden: item.overridePrice != null && item.overridePrice !== product.sellingPrice
         });
