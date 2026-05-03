@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const extraCostSchema = new mongoose.Schema({
   name: { type: String, required: true },     // e.g. "Raw material", "Printer", "Sticker Paper"
   amount: { type: Number, required: true },
-  category: { 
-    type: String, 
+  category: {
+    type: String,
     enum: ['Raw', 'Packaging', 'Equipment', 'Food', 'Marketing', 'Other'],
     default: 'Other'
   },
@@ -14,4 +14,4 @@ const extraCostSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-module.exports = mongoose.model('ExtraCost', extraCostSchema);
+module.exports = mongoose.models.ExtraCost || mongoose.model('ExtraCost', extraCostSchema);

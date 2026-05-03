@@ -37,4 +37,4 @@ saleSchema.pre('save', function (next) {
     next();
 });
 
-module.exports = mongoose.model('Sale', saleSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

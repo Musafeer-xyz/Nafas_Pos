@@ -11,4 +11,4 @@ const comboSchema = new mongoose.Schema({
   notes: { type: String, default: '' }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Combo', comboSchema);
+module.exports = mongoose.models.Combo || mongoose.model('Combo', comboSchema);
