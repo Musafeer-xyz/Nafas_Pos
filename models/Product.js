@@ -15,6 +15,7 @@ const productSchema = new mongoose.Schema({
     perMLCost: Number,    // calculated cost per ml
   },
   notes: { type: String, default: '' },
+  tanjimStock: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 
