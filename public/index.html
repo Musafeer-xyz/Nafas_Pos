@@ -2641,7 +2641,7 @@
         sizeSummary = {};
         bottles.forEach(b => {
           (b.sizes || []).forEach(s => {
-            sizeSummary[s.size] = (sizeSummary[s.size] || 0) + s.qty;
+            sizeSummary[String(s.size)] = (sizeSummary[String(s.size)] || 0) + s.qty;
           });
         });
         localStorage.setItem('nafas_bottle_stock', JSON.stringify(sizeSummary));
@@ -2743,7 +2743,7 @@
       // Update running stock too
       let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || '{}');
       sizes.forEach(s => {
-        stock[s.size] = (stock[s.size] || 0) + s.qty;
+        stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
       });
       localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
 
@@ -3749,7 +3749,7 @@
         stock = {};
         bottles.forEach(b => {
           (b.sizes || []).forEach(s => {
-            stock[s.size] = (stock[s.size] || 0) + s.qty;
+            stock[String(s.size)] = (stock[String(s.size)] || 0) + s.qty;
           });
         });
       }
@@ -3763,8 +3763,9 @@
         let matchSize = sizes.reduce((prev, curr) =>
           Math.abs(curr - qty) < Math.abs(prev - qty) ? curr : prev
         );
-        if (stock[matchSize] && stock[matchSize] > 0) {
-          stock[matchSize] = Math.max(0, stock[matchSize] - 1);
+        const key = String(matchSize);
+        if (stock[key] && stock[key] > 0) {
+          stock[key] = Math.max(0, stock[key] - 1);
         }
       });
 
