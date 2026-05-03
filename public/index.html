@@ -2350,14 +2350,18 @@
         notes: document.getElementById('sale-notes').value,
         store: activeSaleStore,
         date: document.getElementById('sale-date').value || new Date().toISOString(),
-        items: cart.map(i => ({
-          itemId: i.itemId,
-          itemType: i.itemType,
-          qty: parseFloat(i.qty),
-          overridePrice: (i.perMlPrice && i.itemType === 'Product')
-            ? parseFloat((i.perMlPrice * i.qty).toFixed(2))  // total price for this qty
-            : (i.isOverridden ? i.unitPrice : undefined)
-        })),
+        items: cart.map(i => {
+          // Calculate the correct per-unit price for this qty
+          const totalPrice = i.perMlPrice ? i.perMlPrice * i.qty : i.unitPrice;
+          const perUnitPrice = parseFloat((totalPrice / i.qty).toFixed(2));
+          return {
+            itemId: i.itemId,
+            itemType: i.itemType,
+            qty: parseFloat(i.qty),
+            // Always send overridePrice as per-unit so backend does qty × overridePrice correctly
+            overridePrice: perUnitPrice
+          };
+        }),
         extraCosts: {
           packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
           delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
@@ -2365,11 +2369,13 @@
           otherNote: document.getElementById('ec-note').value || ''
         }
 
+
       };
 
       try {
         await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
         cart = [];
+        deductBottlesAfterSale(cart);
         showToast(`✓ ${activeSaleStore === 'tanjim' ? "Tanjim's sale" : 'Sale'} recorded!`, 'success');
         renderSaleEntry();
       } catch (err) {
@@ -2636,12 +2642,20 @@
       }, {});
 
       // Build size summary
-      const sizeSummary = {};
-      bottles.forEach(b => {
-        (b.sizes || []).forEach(s => {
-          sizeSummary[s.size] = (sizeSummary[s.size] || 0) + s.qty;
+      // Read current stock from running total (updated after each sale)
+      const savedStock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
+      let sizeSummary = {};
+
+      if (savedStock) {
+        sizeSummary = savedStock;
+      } else {
+        // First time - calculate from purchase history
+        bottles.forEach(b => {
+          (b.sizes || []).forEach(s => {
+            sizeSummary[s.size] = (sizeSummary[s.size] || 0) + s.qty;
+          });
         });
-      });
+      }
 
       el.innerHTML = `
     <div class="card">
@@ -3737,6 +3751,43 @@
 
     function icon(name, type = 'section') {
       return `<span class="${type}-icon">${ICONS[name] || ICONS.guide}</span>`;
+    }
+
+    //bottle update
+    function deductBottlesAfterSale(cartItems) {
+      const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+
+      // Build current bottle stock summary
+      const stock = {};
+      bottles.forEach(b => {
+        (b.sizes || []).forEach(s => {
+          stock[s.size] = (stock[s.size] || 0) + s.qty;
+        });
+      });
+
+      // For each product sold, deduct the closest bottle size
+      cartItems.forEach(item => {
+        if (item.itemType !== 'Product') return;
+        const qty = parseFloat(item.qty);
+        // Find matching bottle size (3.5, 6, 12, 15 etc.)
+        const sizes = [3.5, 6, 12, 15, 20, 30, 50, 100];
+        const matchSize = sizes.find(s => Math.abs(s - qty) < 0.1);
+        if (matchSize && stock[matchSize] > 0) {
+          stock[matchSize]--;
+        }
+      });
+
+      // Save back as a new stock-correction entry
+      const corrected = bottles.map(b => ({
+        ...b,
+        sizes: (b.sizes || []).map(s => ({
+          ...s,
+          qty: Math.max(0, stock[s.size] !== undefined ? stock[s.size] : s.qty)
+        }))
+      }));
+
+      // Simpler approach - store running stock separately
+      localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
     }
 
   </script>
