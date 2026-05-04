@@ -3627,20 +3627,29 @@
 
         function openImportModal() {
           importTab = 'products';
-          switchImportTab('products');
-          document.getElementById('imp-progress-wrap').style.display = 'none';
-          document.getElementById('imp-result').style.display = 'none';
-          document.getElementById('imp-submit-btn').disabled = false;
-          openModal('import-modal');
+          openModal('import-modal'); // open FIRST before touching inner elements
+          setTimeout(() => {        // then init inner elements after modal is visible
+            try {
+              switchImportTab('products');
+              document.getElementById('imp-progress-wrap').style.display = 'none';
+              document.getElementById('imp-result').style.display = 'none';
+              document.getElementById('imp-submit-btn').disabled = false;
+            } catch (e) {
+              console.error('Import modal init error:', e);
+            }
+          }, 50);
         }
 
         function switchImportTab(tab) {
           importTab = tab;
           ['products', 'sales', 'costs'].forEach(t => {
-            document.getElementById(`imp-${t}-panel`).style.display = t === tab ? 'block' : 'none';
-            document.getElementById(`imp-tab-${t}`).classList.toggle('active', t === tab);
+            const panel = document.getElementById(`imp-${t}-panel`);
+            const tabEl = document.getElementById(`imp-tab-${t}`);
+            if (panel) panel.style.display = t === tab ? 'block' : 'none';
+            if (tabEl) tabEl.classList.toggle('active', t === tab);
           });
-          document.getElementById('imp-result').style.display = 'none';
+          const result = document.getElementById('imp-result');
+          if (result) result.style.display = 'none';
         }
 
         // -- Parse helpers --
