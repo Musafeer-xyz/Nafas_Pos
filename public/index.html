@@ -1932,8 +1932,6 @@
             // Savings = Revenue - All operational costs
             const savings = allTimeData.totalRevenue - allTimeData.totalExtraCosts;
 
-            // Tanjim stock summary
-            const tanjimProducts = products.filter(p => (p.tanjimStock || 0) > 0);
 
             el.innerHTML = `
       <div class="period-tabs">
@@ -1975,21 +1973,7 @@
       </div>
 
       <!-- STOCK DISTRIBUTION SUMMARY -->
-      ${tanjimProducts.length > 0 ? `
-        <div class="card">
-          <div class="card-title">${icon('tanjim')}Tanjim's Stock</div>
-          ${tanjimProducts.map(p => `
-            <div class="flex-between" style="padding:0.35rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
-              <span style="font-size:0.85rem">${p.name}</span>
-              <span class="text-gold font-bold" style="font-size:0.85rem">${p.tanjimStock}${p.unit}</span>
-            </div>
-          `).join('')}
-          <div class="flex-between" style="padding:0.5rem 0 0">
-            <span style="font-size:0.78rem;color:var(--text-muted)">Total given</span>
-            <span style="font-size:0.85rem;font-weight:700;color:var(--gold)">${tanjimProducts.reduce((s, p) => s + (p.tanjimStock || 0), 0).toFixed(1)}ml</span>
-          </div>
-        </div>
-      ` : ''}
+
 
       ${data.topProducts.length ? `
         <div class="card">
@@ -2503,7 +2487,6 @@
         ${products.length === 0 ? `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No products yet</div></div>` :
                 products.map(p => {
                   const mv = p.unit === 'ml' ? p.stock * (p.purchaseRate / 100) : p.stock * p.purchaseRate;
-                  const tanjim = p.tanjimStock || 0;
                   return `
             <div class="item-row">
               <div style="flex:1">
@@ -2513,7 +2496,6 @@
                 </div>
                 <div style="display:flex;gap:0.5rem;margin-top:0.2rem;flex-wrap:wrap">
                   <span style="font-size:0.68rem;color:var(--text-muted)">Market val: <span style="color:var(--gold)">৳${Math.round(mv).toLocaleString()}</span></span>
-                  ${tanjim > 0 ? `<span style="font-size:0.68rem;color:#52c07a">Tanjim: ${tanjim}${p.unit}</span>` : ''}
                 </div>
               </div>
               <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem">
