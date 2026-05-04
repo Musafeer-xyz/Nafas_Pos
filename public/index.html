@@ -1607,27 +1607,6 @@
         <span style="font-size:0.82rem">Delete Sales</span>
       </label>
 
-      <!-- ═══ TANJIM DISTRIBUTION MODAL ═══ -->
-      <div class="modal-overlay" id="tanjim-modal">
-        <div class="modal" style="border-radius:20px 20px 0 0;max-height:88vh">
-          <div class="modal-handle"></div>
-          <div class="modal-title">🤝 Give Stock to Tanjim</div>
-          <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5">
-            Select quantity to give from each attar. Stock will be deducted from main and tracked under Tanjim.
-          </p>
-          <div id="tanjim-list">
-            <div class="loading-center">
-              <div class="spinner"></div>
-            </div>
-          </div>
-          <div style="display:flex;gap:0.5rem;margin-top:1rem">
-            <button class="btn btn-outline" style="flex:1" onclick="closeModal('tanjim-modal')">Cancel</button>
-            <button class="btn btn-primary" style="flex:1" onclick="saveTanjimDistribution()">✓ Confirm Give</button>
-          </div>
-        </div>
-      </div>
-
-
 
       <!-- ═══ BULK IMPORT MODAL ═══ -->
       <div class="modal-overlay" id="import-modal">
@@ -1855,7 +1834,7 @@
           document.getElementById('app').style.flexDirection = 'column';
           const displayName = userName || (role === 'admin' ? 'Tanjim' : 'User');
           document.getElementById('topbar-role').textContent = role === 'admin'
-            ? `👑 ${displayName}` : `👤 ${displayName}`;
+            ? `♛ ${displayName}` : `👤 ${displayName}`;
           // Load branches first, then build nav
           loadBranchesAndInit();
         }
@@ -2513,7 +2492,6 @@
         <button class="btn btn-primary btn-sm" onclick="openProductModal()">+ Product</button>
         <button class="btn btn-success btn-sm" onclick="openModal('combo-modal');loadComboProductOptions()">+ Combo</button>
         <button class="btn btn-outline btn-sm" onclick="openImportModal()">📥 Import</button>
-        <button class="btn btn-outline btn-sm" onclick="openTanjimModal()">🤝 Give Tanjim</button>
         <button class="btn btn-outline btn-sm" onclick="navigateTo('bottles')">🍶 Bottles</button>
       </div>
       <div class="card" style="margin-bottom:0.75rem">
@@ -2634,91 +2612,6 @@
             renderProducts();
           } catch (err) {
             showToast(err.message, 'error');
-          }
-        }
-
-        // ===============================================
-        //  TANJIM STOCK DISTRIBUTION
-        // ===============================================
-        let tanjimProductCache = [];
-
-        async function openTanjimModal() {
-          tanjimProductCache = await apiFetch('/api/products') || [];
-          const attars = tanjimProductCache.filter(p => p.category === 'Attar');
-
-          const container = document.getElementById('tanjim-list');
-          container.innerHTML = attars.map((p, i) => `
-    <div style="padding:0.65rem 0;border-bottom:1px solid rgba(201,168,76,0.08)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
-        <div>
-          <div style="font-size:0.88rem;font-weight:500">${p.name}</div>
-          <div style="font-size:0.7rem;color:var(--text-muted)">Available: ${p.stock}${p.unit} · Already given: ${p.tanjimStock || 0}${p.unit}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center">
-        <span style="font-size:0.72rem;color:var(--text-muted)">Give:</span>
-        ${[3.5, 6, 12, 15].map(qty => `
-          <button class="btn btn-outline btn-sm" style="padding:0.3rem 0.6rem;font-size:0.75rem"
-            onclick="setTanjimQty(${i}, ${qty})">
-            ${qty}ml
-          </button>
-        `).join('')}
-        <input class="form-input" type="number" id="tanjim-qty-${i}"
-          placeholder="custom" step="0.5" min="0"
-          style="width:75px;padding:0.3rem 0.5rem;font-size:0.8rem"
-          value="0"/>
-      </div>
-    </div>
-  `).join('');
-
-          openModal('tanjim-modal');
-        }
-
-        function setTanjimQty(i, qty) {
-          const inp = document.getElementById(`tanjim-qty-${i}`);
-          if (inp) inp.value = qty;
-        }
-
-        async function saveTanjimDistribution() {
-          const attars = tanjimProductCache.filter(p => p.category === 'Attar');
-          let updated = 0;
-          const errors = [];
-
-          for (let i = 0; i < attars.length; i++) {
-            const inp = document.getElementById(`tanjim-qty-${i}`);
-            if (!inp) continue;
-            const qty = parseFloat(inp.value) || 0;
-            if (qty <= 0) continue;
-
-            const p = attars[i];
-            if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
-
-            try {
-              // Only send the fields that need to change - avoid spreading entire object
-              await apiFetch(`/api/products/${p._id}`, {
-                method: 'PUT',
-                body: JSON.stringify({
-                  stock: parseFloat((p.stock - qty).toFixed(1)),
-                  tanjimStock: parseFloat(((p.tanjimStock || 0) + qty).toFixed(1))
-                })
-              });
-              // Update local cache so next iteration has correct values
-              p.stock = parseFloat((p.stock - qty).toFixed(1));
-              p.tanjimStock = parseFloat(((p.tanjimStock || 0) + qty).toFixed(1));
-              updated++;
-            } catch (e) {
-              errors.push(`${p.name}: ${e.message}`);
-            }
-          }
-
-          if (errors.length) {
-            showToast(errors[0], 'error');
-          } else if (updated > 0) {
-            showToast(`✓ ${updated} product(s) transferred to Tanjim`, 'success');
-            closeModal('tanjim-modal');
-            renderProducts();
-          } else {
-            showToast('No quantities entered', 'error');
           }
         }
 
