@@ -1738,138 +1738,11 @@
       <div id="toast"></div>
 
       <script>
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  CONFIG & STATE
-        // ═══════════════════════════════════════════════
+        // ===============================================
 
-        // ═══════════════════════════════════════════════
-        // BRANCH MANAGEMENT
-        // ═══════════════════════════════════════════════
-        function openBranchModal() {
-          document.getElementById('branch-name').value = '';
-          document.getElementById('branch-location').value = '';
-          document.getElementById('branch-notes').value = '';
-          openModal('branch-modal');
-        }
 
-        async function saveBranch() {
-          const name = document.getElementById('branch-name').value.trim();
-          if (!name) return showToast('Branch name required', 'error');
-          try {
-            await apiFetch('/api/branches', {
-              method: 'POST',
-              body: JSON.stringify({
-                name,
-                location: document.getElementById('branch-location').value,
-                notes: document.getElementById('branch-notes').value
-              })
-            });
-            allBranches = await apiFetch('/api/branches') || [];
-            showToast(`✓ ${name} branch created`, 'success');
-            closeModal('branch-modal');
-            renderUsers();
-          } catch (err) {
-            showToast(err.message, 'error');
-          }
-        }
-
-        async function deleteBranch(id, name) {
-          if (!confirm(`Delete "${name}" branch? All its stock will return to Main Store.`)) return;
-          try {
-            await apiFetch(`/api/branches/${id}`, { method: 'DELETE' });
-            allBranches = await apiFetch('/api/branches') || [];
-            showToast(`${name} deleted, stock returned to main`, 'success');
-            renderUsers();
-          } catch (err) {
-            showToast(err.message, 'error');
-          }
-        }
-
-        // ─── Stock Transfer ───
-        let transferDir = 'give';
-        let transferBranchId = null;
-
-        function setTransferDir(dir) {
-          transferDir = dir;
-          document.getElementById('transfer-give-tab').classList.toggle('active', dir === 'give');
-          document.getElementById('transfer-return-tab').classList.toggle('active', dir === 'return');
-          loadTransferProducts();
-        }
-
-        async function openTransferModal(branchId, branchName) {
-          transferBranchId = branchId;
-          transferDir = 'give';
-          document.getElementById('transfer-branch-id').value = branchId;
-          document.getElementById('transfer-modal-title').textContent = `Transfer Stock — ${branchName}`;
-          document.getElementById('transfer-give-tab').classList.add('active');
-          document.getElementById('transfer-return-tab').classList.remove('active');
-          openModal('transfer-modal');
-          await loadTransferProducts();
-        }
-
-        async function loadTransferProducts() {
-          const container = document.getElementById('transfer-product-list');
-          container.innerHTML = '<div class="loading-center">
-            < div class="spinner" ></div >
-      </div > ';
-          try {
-            const products = await apiFetch('/api/products');
-            const attars = products.filter(p => p.category === 'Attar' && p.isActive !== false);
-
-            container.innerHTML = attars.map((p, i) => {
-              const branchEntry = (p.branchStock || []).find(b => b.branchId === transferBranchId);
-              const branchQty = branchEntry ? branchEntry.qty : 0;
-              const available = transferDir === 'give' ? p.stock : branchQty;
-              return `
-      <div style="padding:0.6rem 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
-          <div>
-            <span style="font-weight:500;font-size:0.85rem">${p.name}</span>
-            ${p.grade ? `<span
-              style="font-size:0.65rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.35rem;border-radius:4px;margin-left:0.3rem">${p.grade}</span>`
-                  : ''}
-          </div>
-          <span style="font-size:0.75rem;color:${available > 0 ? 'var(--success)' : 'var(--danger)'}">
-            ${transferDir === 'give' ? 'Main' : 'Branch'}: ${available}${p.unit}
-          </span>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.4rem">
-          <span style="font-size:0.72rem;color:var(--text-muted);min-width:55px">Transfer:</span>
-          ${[3.5, 6, 12, 15].map(qty => `
-          <button class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.72rem"
-            onclick="document.getElementById('tr-qty-${i}').value=${qty}">${qty}ml</button>
-          `).join('')}
-          <input class="form-input" type="number" id="tr-qty-${i}" data-product-id="${p._id}" placeholder="0" step="0.5"
-            min="0" value="0" style="width:65px;padding:0.25rem 0.4rem;font-size:0.8rem" />
-        </div>
-      </div>`;
-            }).join('') || '<div class="empty-state">
-              < div class="empty-text" > No products found</div >
-      </div > ';
-          } catch (err) {
-            container.innerHTML = `<p class="text-danger">${err.message}</p>`;
-          }
-        }
-
-        async function executeTransfer() {
-          const inputs = document.querySelectorAll('#transfer-product-list input[type="number"]');
-          let transferred = 0;
-          const errors = [];
-
-          for (const inp of inputs) {
-            const qty = parseFloat(inp.value) || 0;
-            if (qty <= 0) continue; const productId = inp.dataset.productId; try {
-              await apiFetch('/api/branches/transfer', {
-                method: 'POST', body: JSON.stringify({ branchId: transferBranchId, productId, qty, direction: transferDir })
-              }); transferred++;
-            } catch (err) { errors.push(err.message); }
-          } if (transferred > 0) {
-            showToast(`✓ ${transferred} product(s) transferred`, 'success');
-            allBranches = await apiFetch('/api/branches') || [];
-          }
-          if (errors.length) showToast(errors[0], 'error');
-          if (transferred > 0) closeModal('transfer-modal');
-        }
         const API = '';
         let token = localStorage.getItem('nafas_token') || null;
         let role = localStorage.getItem('nafas_role') || null;
@@ -1884,15 +1757,15 @@
         let activeBranchId = null; // null = main store
         let activeBranchName = 'Main Store';
 
-        // Permission helper — admin always true
+        // Permission helper - admin always true
         function can(perm) {
           if (role === 'admin') return true;
           return !!(userPerms && userPerms[perm]);
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  AUTH
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let pinBuffer = '';
 
         function addPin(digit) {
@@ -1955,9 +1828,9 @@
           document.getElementById('login-error').textContent = '';
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  API HELPERS
-        // ═══════════════════════════════════════════════
+        // ===============================================
         async function apiFetch(path, opts = {}) {
           const res = await fetch(API + path, {
             ...opts,
@@ -1973,9 +1846,9 @@
           return data;
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  APP INIT
-        // ═══════════════════════════════════════════════
+        // ===============================================
         function initApp() {
           document.getElementById('login-screen').style.display = 'none';
           document.getElementById('app').style.display = 'flex';
@@ -2045,9 +1918,9 @@
           if (fn) fn();
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  DASHBOARD (Admin)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let dashPeriod = 'today';
 
         async function renderDashboard() {
@@ -2178,9 +2051,9 @@
 
         function setDashPeriod(p) { dashPeriod = p; renderDashboard(); }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  SALE ENTRY
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let activeSaleStore = 'siam'; // 'Main' or 'tanjim'
 
         async function renderSaleEntry() {
@@ -2199,7 +2072,7 @@
               const b = allBranches.find(x => x._id === userPerms.assignedBranchId);
               if (b) stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' });
             } else {
-              // Admin or unassigned — show all branches
+              // Admin or unassigned - show all branches
               allBranches.forEach(b => stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' }));
             }
           }
@@ -2349,7 +2222,7 @@
           }
 
           el.innerHTML = cart.map((item, idx) => {
-            // totalPrice = perMlPrice × qty (for products), or unitPrice flat (for combos)
+            // totalPrice = perMlPrice  qty (for products), or unitPrice flat (for combos)
             const totalPrice = (item.perMlPrice && item.itemType === 'Product')
               ? item.perMlPrice * item.qty
               : item.unitPrice;
@@ -2523,7 +2396,7 @@
           showToast(`✓ ${name} added to cart`, 'success');
         }
 
-        // ── Qty controls ──
+        // -- Qty controls --
         function changeCartQty(idx, delta) {
           const item = cart[idx];
           const newQty = Math.max(0.5, parseFloat((item.qty + delta).toFixed(1)));
@@ -2602,9 +2475,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  PRODUCTS (Admin)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let productFilter = 'all';
 
         async function renderProducts() {
@@ -2764,9 +2637,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  TANJIM STOCK DISTRIBUTION
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let tanjimProductCache = [];
 
         async function openTanjimModal() {
@@ -2821,7 +2694,7 @@
             if (qty > p.stock) { errors.push(`${p.name}: only ${p.stock}ml available`); continue; }
 
             try {
-              // Only send the fields that need to change — avoid spreading entire object
+              // Only send the fields that need to change - avoid spreading entire object
               await apiFetch(`/api/products/${p._id}`, {
                 method: 'PUT',
                 body: JSON.stringify({
@@ -2849,9 +2722,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  BOTTLE TRACKER
-        // ═══════════════════════════════════════════════
+        // ===============================================
         async function renderBottles() {
           const el = document.getElementById('main-content');
 
@@ -3003,7 +2876,7 @@
           renderBottles();
         }
 
-        // ─── Combo ───
+        // --- Combo ---
         async function loadComboProductOptions() {
           allProducts = await apiFetch('/api/products') || [];
           const container = document.getElementById('combo-products-list');
@@ -3052,9 +2925,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  SALE HISTORY (Admin)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         async function renderHistory() {
           const el = document.getElementById('main-content');
           el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
@@ -3107,9 +2980,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  COSTS (Admin)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         async function renderCosts() {
           const el = document.getElementById('main-content');
           el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
@@ -3262,9 +3135,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
-        //  DOWNLOAD — Excel + PDF
-        // ═══════════════════════════════════════════════
+        // ===============================================
+        //  DOWNLOAD - Excel + PDF
+        // ===============================================
         async function downloadData(format) {
           showToast('Preparing download...', '');
           try {
@@ -3297,7 +3170,7 @@
 
           let csv = '';
 
-          // ── Summary Sheet ──
+          // -- Summary Sheet --
           csv += 'NAFAS BUSINESS SUMMARY\n';
           csv += `Generated,${fmtDate(new Date())}\n\n`;
           csv += `Total Revenue,৳${summary.totalRevenue.toLocaleString()}\n`;
@@ -3305,7 +3178,7 @@
           csv += `Savings (In Hand),৳${summary.savings.toLocaleString()}\n`;
           csv += `Inventory Market Value,৳${Math.round(summary.marketValue).toLocaleString()}\n\n`;
 
-          // ── Products ──
+          // -- Products --
           csv += '\nPRODUCTS\n';
           csv += 'Name,Grade,Category,Stock,Unit,Purchase Rate/100ml,Selling Price/3.5ml,Market Value,Lot,Tanjim Stock\n';
           products.forEach(p => {
@@ -3315,7 +3188,7 @@
             esc(p.lotInfo?.lotName || ''), p.tanjimStock || 0].join(',') + '\n';
           });
 
-          // ── Sales ──
+          // -- Sales --
           csv += '\nSALES HISTORY\n';
           csv += 'Date,Customer,Items,Store,Channel,Revenue,Extra Costs,Net Profit,Sold By\n';
           sales.forEach(s => {
@@ -3326,7 +3199,7 @@
             s.netProfit || 0, s.soldBy].join(',') + '\n';
           });
 
-          // ── Costs ──
+          // -- Costs --
           csv += '\nCOSTS\n';
           csv += 'Date,Name,Category,Amount,Status,Due Amount,Notes\n';
           costs.forEach(c => {
@@ -3485,9 +3358,9 @@
           showToast('PDF ready — use Print → Save as PDF ✓', 'success');
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  STOCK VIEW (Assistant)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         async function renderStockView() {
           const el = document.getElementById('main-content');
           el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
@@ -3512,9 +3385,9 @@
           }
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  MODAL & TOAST HELPERS
-        // ═══════════════════════════════════════════════
+        // ===============================================
         function openModal(id) { document.getElementById(id).classList.add('open'); }
         function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
@@ -3539,9 +3412,9 @@
           }, 2500);
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  USERS MANAGEMENT (Admin only)
-        // ═══════════════════════════════════════════════
+        // ===============================================
         const ALL_PERMS = [
           { key: 'viewDashboard', label: 'View Dashboard & Revenue' },
           { key: 'viewStock', label: 'View Stock' },
@@ -3743,9 +3616,134 @@
           });
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
+        // BRANCH MANAGEMENT
+        // ===============================================
+        function openBranchModal() {
+          document.getElementById('branch-name').value = '';
+          document.getElementById('branch-location').value = '';
+          document.getElementById('branch-notes').value = '';
+          openModal('branch-modal');
+        }
+
+        async function saveBranch() {
+          const name = document.getElementById('branch-name').value.trim();
+          if (!name) return showToast('Branch name required', 'error');
+          try {
+            await apiFetch('/api/branches', {
+              method: 'POST',
+              body: JSON.stringify({
+                name,
+                location: document.getElementById('branch-location').value,
+                notes: document.getElementById('branch-notes').value
+              })
+            });
+            allBranches = await apiFetch('/api/branches') || [];
+            showToast(`✓ ${name} branch created`, 'success');
+            closeModal('branch-modal');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        async function deleteBranch(id, name) {
+          if (!confirm(`Delete "${name}" branch? All its stock will return to Main Store.`)) return;
+          try {
+            await apiFetch(`/api/branches/${id}`, { method: 'DELETE' });
+            allBranches = await apiFetch('/api/branches') || [];
+            showToast(`${name} deleted, stock returned to main`, 'success');
+            renderUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+
+        // --- Stock Transfer ---
+        let transferDir = 'give';
+        let transferBranchId = null;
+
+        function setTransferDir(dir) {
+          transferDir = dir;
+          document.getElementById('transfer-give-tab').classList.toggle('active', dir === 'give');
+          document.getElementById('transfer-return-tab').classList.toggle('active', dir === 'return');
+          loadTransferProducts();
+        }
+
+        async function openTransferModal(branchId, branchName) {
+          transferBranchId = branchId;
+          transferDir = 'give';
+          document.getElementById('transfer-branch-id').value = branchId;
+          document.getElementById('transfer-modal-title').textContent = `Transfer Stock — ${branchName}`;
+          document.getElementById('transfer-give-tab').classList.add('active');
+          document.getElementById('transfer-return-tab').classList.remove('active');
+          openModal('transfer-modal');
+          await loadTransferProducts();
+        }
+
+        async function loadTransferProducts() {
+          const container = document.getElementById('transfer-product-list');
+          container.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
+          try {
+            const products = await apiFetch('/api/products');
+            const attars = products.filter(p => p.category === 'Attar' && p.isActive !== false);
+
+            container.innerHTML = attars.map((p, i) => {
+              const branchEntry = (p.branchStock || []).find(b => b.branchId === transferBranchId);
+              const branchQty = branchEntry ? branchEntry.qty : 0;
+              const available = transferDir === 'give' ? p.stock : branchQty;
+              return `
+      <div style="padding:0.6rem 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+          <div>
+            <span style="font-weight:500;font-size:0.85rem">${p.name}</span>
+            ${p.grade ? `<span
+              style="font-size:0.65rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.35rem;border-radius:4px;margin-left:0.3rem">${p.grade}</span>`
+                  : ''}
+          </div>
+          <span style="font-size:0.75rem;color:${available > 0 ? 'var(--success)' : 'var(--danger)'}">
+            ${transferDir === 'give' ? 'Main' : 'Branch'}: ${available}${p.unit}
+          </span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.4rem">
+          <span style="font-size:0.72rem;color:var(--text-muted);min-width:55px">Transfer:</span>
+          ${[3.5, 6, 12, 15].map(qty => `
+          <button class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.72rem"
+            onclick="document.getElementById('tr-qty-${i}').value=${qty}">${qty}ml</button>
+          `).join('')}
+          <input class="form-input" type="number" id="tr-qty-${i}" data-product-id="${p._id}" placeholder="0" step="0.5"
+            min="0" value="0" style="width:65px;padding:0.25rem 0.4rem;font-size:0.8rem" />
+        </div>
+      </div>`;
+            }).join('') || '<div class="empty-state"><div class="empty-text">No products found</div></div>';
+          } catch (err) {
+            container.innerHTML = `<p class="text-danger">${err.message}</p>`;
+          }
+        }
+
+        async function executeTransfer() {
+          const inputs = document.querySelectorAll('#transfer-product-list input[type="number"]');
+          let transferred = 0;
+          const errors = [];
+
+          for (const inp of inputs) {
+            const qty = parseFloat(inp.value) || 0;
+            if (qty <= 0) continue; const productId = inp.dataset.productId; try {
+              await apiFetch('/api/branches/transfer', {
+                method: 'POST', body: JSON.stringify({ branchId: transferBranchId, productId, qty, direction: transferDir })
+              }); transferred++;
+            } catch (err) { errors.push(err.message); }
+          } if (transferred > 0) {
+            showToast(`✓ ${transferred} product(s) transferred`, 'success');
+            allBranches = await apiFetch('/api/branches') || [];
+          }
+          if (errors.length) showToast(errors[0], 'error');
+          if (transferred > 0) closeModal('transfer-modal');
+        }
+
+        // ===============================================
         //  BULK IMPORT
-        // ═══════════════════════════════════════════════
+        // ===============================================
         let importTab = 'products';
 
         function openImportModal() {
@@ -3766,7 +3764,7 @@
           document.getElementById('imp-result').style.display = 'none';
         }
 
-        // ── Parse helpers ──
+        // -- Parse helpers --
         function parseProductLines(raw) {
           const category = document.getElementById('imp-category').value;
           const unit = document.getElementById('imp-unit').value;
@@ -3830,7 +3828,7 @@
           return { rows, errors };
         }
 
-        // ── Show preview before importing ──
+        // -- Show preview before importing --
         function showImportPreview(rows, errors, tab) {
           const el = document.getElementById(`imp-${tab}-preview`);
           if (!el) return;
@@ -3846,7 +3844,7 @@
           el.innerHTML = html;
         }
 
-        // ── Live preview as user types ──
+        // -- Live preview as user types --
         document.addEventListener('DOMContentLoaded', () => {
           ['products', 'sales', 'costs'].forEach(tab => {
             const el = document.getElementById(`imp-${tab}-text`);
@@ -3860,7 +3858,7 @@
           });
         });
 
-        // ── Run Import ──
+        // -- Run Import --
         async function runImport() {
           const btn = document.getElementById('imp-submit-btn');
           btn.disabled = true;
@@ -3969,9 +3967,9 @@
           btn.disabled = false;
         }
 
-        // ═══════════════════════════════════════════════
+        // ===============================================
         //  AUTO-LOGIN if token exists
-        // ═══════════════════════════════════════════════
+        // ===============================================
         if (token && role) {
           // Verify token is still valid
           fetch('/api/dashboard/assistant', {
@@ -3982,9 +3980,9 @@
           }).catch(() => logout());
         }
 
-        // ═══════════════════════════════════════════════
-        //  SVG ICON LIBRARY — Minimal Line Style
-        // ═══════════════════════════════════════════════
+        // ===============================================
+        //  SVG ICON LIBRARY - Minimal Line Style
+        // ===============================================
         const ICONS = {
           dashboard: `<svg viewBox="0 0 24 24" width="20" height="20"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
           sale: `<svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>`,
@@ -4015,7 +4013,7 @@
 
         //bottle update
         function deductBottlesAfterSale(cartItems) {
-          // Get current stock — initialize from purchase history if first time
+          // Get current stock - initialize from purchase history if first time
           let stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || 'null');
 
           if (!stock) {
