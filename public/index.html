@@ -1728,7 +1728,8 @@
       <div id="imp-result" style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:8px;font-size:0.82rem">
       </div>
 
-      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+      <div
+        style="display:flex;gap:0.5rem;margin-top:1rem;flex-shrink:0;padding-top:0.75rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--card)">
         <button class="btn btn-outline" style="flex:1" onclick="closeModal('import-modal')">Close</button>
         <button class="btn btn-primary" style="flex:1" id="imp-submit-btn" onclick="runImport()">Import
           Now</button>
