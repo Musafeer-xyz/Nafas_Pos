@@ -1573,56 +1573,58 @@
 
       <!-- Permissions -->
       <div class="form-label" style="margin-bottom:0.5rem">Permissions</div>
-      <div style="flex:1;overflow-y:auto;max-height:35vh;margin:0 -0.25rem;padding:0 0.25rem;display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-viewDashboard" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">View Dashboard & Revenue</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-viewStock" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">View Stock</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-viewHistory" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">View Sale History</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-sellMain" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Record Sales (Main Store)</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-sellBranch" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Record Sales (Branch)</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-addProducts" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Add / Edit Products</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-manageCosts" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Manage Costs</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-transferStock" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Transfer Stock to Branch</span>
-      </label>
-      <label
-        style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-        <input type="checkbox" id="perm-deleteSales" style="width:16px;height:16px;accent-color:var(--gold)" />
-        <span style="font-size:0.82rem">Delete Sales</span>
-      </label>
+      <div
+        style="flex:1;overflow-y:auto;max-height:35vh;margin:0 -0.25rem;padding:0 0.25rem;display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-viewDashboard" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">View Dashboard & Revenue</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-viewStock" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">View Stock</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-viewHistory" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">View Sale History</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-sellMain" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Record Sales (Main Store)</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-sellBranch" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Record Sales (Branch)</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-addProducts" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Add / Edit Products</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-manageCosts" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Manage Costs</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-transferStock" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Transfer Stock to Branch</span>
+        </label>
+        <label
+          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
+          <input type="checkbox" id="perm-deleteSales" style="width:16px;height:16px;accent-color:var(--gold)" />
+          <span style="font-size:0.82rem">Delete Sales</span>
+        </label>
       </div>
     </div>
 
-    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+    <div
+      style="display:flex;gap:0.5rem;margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);flex-shrink:0">
       <button class="btn btn-outline" style="flex:1" onclick="closeModal('user-modal')">Cancel</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save User</button>
     </div>
