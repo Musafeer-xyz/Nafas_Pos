@@ -1621,11 +1621,11 @@
           <input type="checkbox" id="perm-deleteSales" style="width:16px;height:16px;accent-color:var(--gold)" />
           <span style="font-size:0.82rem">Delete Sales</span>
         </label>
-    <div
-      style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.75rem;border-top:1px solid var(--border);flex-shrink:0;position:sticky;bottom:0;background:var(--card);padding-bottom:0.5rem">
-      <button class="btn btn-outline" style="flex:1" onclick="closeModal('user-modal')">Cancel</button>
-      <button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save User</button>
-    </div>
+        <div
+          style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.75rem;border-top:1px solid var(--border);flex-shrink:0;position:sticky;bottom:0;background:var(--card);padding-bottom:0.5rem">
+          <button class="btn btn-outline" style="flex:1" onclick="closeModal('user-modal')">Cancel</button>
+          <button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save User</button>
+        </div>
       </div>
     </div>
 
@@ -2495,11 +2495,12 @@
           ${['all', 'Attar', 'Apparel', 'Gadget'].map(f => `<button class="period-tab ${productFilter === f ? 'active' : ''}" onclick="setProductFilter('${f}')">${f === 'all' ? 'All' : f}</button>`).join('')}
         </div>
       </div>
-      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
+<div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openProductModal()">+ Product</button>
         <button class="btn btn-success btn-sm" onclick="openModal('combo-modal');loadComboProductOptions()">+ Combo</button>
         <button class="btn btn-outline btn-sm" onclick="openImportModal()">📥 Import</button>
         <button class="btn btn-outline btn-sm" onclick="navigateTo('bottles')">🍶 Bottles</button>
+        ${allBranches.length > 0 ? `<button class="btn btn-outline btn-sm" onclick="openBranchTransferPicker()">🔄 Transfer Stock</button>` : ''}
       </div>
       <div class="card" style="margin-bottom:0.75rem">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -3351,7 +3352,6 @@
               <div style="font-size:0.72rem;color:var(--text-muted)">${b.location || 'No location'}</div>
             </div>
             <div style="display:flex;gap:0.3rem">
-              <button class="btn btn-outline btn-sm" onclick="openTransferModal('${b._id}', '${b.name}')">Transfer Stock</button>
               <button class="btn btn-danger btn-sm" onclick="deleteBranch('${b._id}', '${b.name}')">Del</button>
             </div>
           </div>
@@ -3554,6 +3554,25 @@
         renderUsers();
       } catch (err) {
         showToast(err.message, 'error');
+      }
+    }
+
+    async function openBranchTransferPicker() {
+      if (allBranches.length === 0) {
+        showToast('No branches yet. Add a branch first in Users tab.', 'error');
+        return;
+      }
+      if (allBranches.length === 1) {
+        // Only one branch — open transfer directly
+        openTransferModal(allBranches[0]._id, allBranches[0].name);
+        return;
+      }
+      // Multiple branches — show picker
+      const branchName = allBranches.map((b, i) => `${i + 1}. ${b.name}`).join('\n');
+      const choice = prompt(`Select branch number:\n${branchName}`);
+      const idx = parseInt(choice) - 1;
+      if (idx >= 0 && idx < allBranches.length) {
+        openTransferModal(allBranches[idx]._id, allBranches[idx].name);
       }
     }
 
