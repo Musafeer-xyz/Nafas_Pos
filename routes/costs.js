@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const ExtraCost = require('../models/ExtraCost');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, can } = require('../middleware/auth');
 
 // GET all costs
-router.get('/', auth, adminOnly, async (req, res) => {
+router.get('/', auth, can('manageCosts'), async (req, res) => {
   try {
     const costs = await ExtraCost.find().sort({ date: -1 });
     res.json(costs);
@@ -14,7 +14,7 @@ router.get('/', auth, adminOnly, async (req, res) => {
 });
 
 // POST create cost
-router.post('/', auth, adminOnly, async (req, res) => {
+router.post('/', auth, can('manageCosts'), async (req, res) => {
   try {
     const cost = new ExtraCost(req.body);
     await cost.save();
@@ -25,7 +25,7 @@ router.post('/', auth, adminOnly, async (req, res) => {
 });
 
 // DELETE cost
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, can('manageCosts'), async (req, res) => {
   try {
     await ExtraCost.findByIdAndDelete(req.params.id);
     res.json({ message: 'Cost deleted' });
