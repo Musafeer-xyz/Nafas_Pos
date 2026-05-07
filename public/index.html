@@ -1529,7 +1529,8 @@
 
   <!-- ═══ USER MANAGEMENT MODAL ═══ -->
   <div class="modal-overlay" id="user-modal">
-    <div class="modal" style="border-radius:20px 20px 0 0;max-height:95vh;display:flex;flex-direction:column">
+    <div class="modal"
+      style="border-radius:20px 20px 0 0;max-height:95vh;display:flex;flex-direction:column;padding-bottom:1rem">
       <div class="modal-handle"></div>
       <div class="modal-title" id="user-modal-title">Add New User</div>
       <input type="hidden" id="user-id-field" />
@@ -1574,7 +1575,7 @@
       <!-- Permissions -->
       <div class="form-label" style="margin-bottom:0.5rem">Permissions</div>
       <div
-        style="flex:1;overflow-y:auto;max-height:35vh;margin:0 -0.25rem;padding:0 0.25rem;display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
+        style="flex:1;overflow-y:auto;max-height:25vh;margin:0 -0.25rem;padding:0 0.25rem;display:flex;flex-direction:column;gap:0.4rem;margin-bottom:1rem">
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
           <input type="checkbox" id="perm-viewDashboard" style="width:16px;height:16px;accent-color:var(--gold)" />
@@ -1623,8 +1624,8 @@
       </div>
     </div>
 
-    <div
-    <div style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.75rem;border-top:1px solid var(--border);flex-shrink:0;position:sticky;bottom:0;background:var(--card);padding-bottom:0.5rem">
+    <div <div
+      style="display:flex;gap:0.5rem;margin-top:auto;padding-top:0.75rem;border-top:1px solid var(--border);flex-shrink:0;position:sticky;bottom:0;background:var(--card);padding-bottom:0.5rem">
       <button class="btn btn-outline" style="flex:1" onclick="closeModal('user-modal')">Cancel</button>
       <button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save User</button>
     </div>
