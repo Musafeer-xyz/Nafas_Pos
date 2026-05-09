@@ -67,10 +67,15 @@ exports.create = async (req, res) => {
         deductStock(product, branchId, item.qty);
         await product.save({ session });
 
-        // Price: overridePrice is 3.5ml base price, calculate per qty
-        const base35 = item.overridePrice ?? product.sellingPrice;
-        const perMl = base35 / 3.5;
-        const lineTotal = parseFloat((perMl * item.qty).toFixed(2));
+        // ✅ Price Logic Fixed: overridePrice is now treated as the exact line total customized by user
+        let lineTotal = 0;
+        if (item.overridePrice != null) {
+          lineTotal = parseFloat(Number(item.overridePrice).toFixed(2));
+        } else {
+          const perMl = product.sellingPrice / 3.5;
+          lineTotal = parseFloat((perMl * item.qty).toFixed(2));
+        }
+
         totalRevenue += lineTotal;
 
         processedItems.push({
@@ -80,7 +85,7 @@ exports.create = async (req, res) => {
           qty: item.qty,
           unitPrice: lineTotal,
           originalPrice: product.sellingPrice,
-          isOverridden: item.overridePrice != null && item.overridePrice !== product.sellingPrice
+          isOverridden: item.overridePrice != null
         });
 
       } else if (item.itemType === 'Combo') {
@@ -105,8 +110,14 @@ exports.create = async (req, res) => {
           await prod.save({ session });
         }
 
-        const unitPrice = item.overridePrice ?? combo.comboPrice;
-        const lineTotal = parseFloat((unitPrice * item.qty).toFixed(2));
+        // ✅ Price Logic Fixed for Combo
+        let lineTotal = 0;
+        if (item.overridePrice != null) {
+          lineTotal = parseFloat(Number(item.overridePrice).toFixed(2));
+        } else {
+          lineTotal = parseFloat((combo.comboPrice * item.qty).toFixed(2));
+        }
+
         totalRevenue += lineTotal;
 
         processedItems.push({
@@ -116,7 +127,7 @@ exports.create = async (req, res) => {
           qty: item.qty,
           unitPrice: lineTotal,
           originalPrice: combo.comboPrice,
-          isOverridden: item.overridePrice != null && item.overridePrice !== combo.comboPrice
+          isOverridden: item.overridePrice != null
         });
       }
     }
