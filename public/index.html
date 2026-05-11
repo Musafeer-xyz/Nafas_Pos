@@ -2367,9 +2367,9 @@
           const type = _itemCacheTypes[idx];
           const item = _itemCache[idx];
           if (type === 'Combo') {
-            addToCart(product._id, 'Product', product.name, product.sellingPrice, product.unit)
+            addToCart(item._id, 'Combo', item.name, item.comboPrice)
           } else {
-            addToCart(product._id, 'Product', product.name, product.sellingPrice, product.unit)
+            addToCart(item._id, 'Product', item.name, item.sellingPrice, item.unit)
           }
         });
       });
