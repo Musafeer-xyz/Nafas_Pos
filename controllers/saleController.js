@@ -71,7 +71,11 @@ exports.create = async (req, res) => {
         let lineTotal = 0;
         if (item.overridePrice != null) {
           lineTotal = parseFloat(Number(item.overridePrice).toFixed(2));
+        } else if (product.unit === 'piece') {
+          // Flat per-piece: sellingPrice × qty
+          lineTotal = parseFloat((product.sellingPrice * item.qty).toFixed(2));
         } else {
+          // Attar ml formula: (sellingPrice / 3.5) × qty
           const perMl = product.sellingPrice / 3.5;
           lineTotal = parseFloat((perMl * item.qty).toFixed(2));
         }
