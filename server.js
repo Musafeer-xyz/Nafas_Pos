@@ -11,10 +11,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// DB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => console.error('❌ MongoDB Error:', err));
+// DB Connection — only when run directly (tests connect their own DB)
+if (require.main === module) {
+  mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('✅ MongoDB Connected'))
+    .catch(err => console.error('❌ MongoDB Error:', err));
+}
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -26,10 +28,18 @@ app.use('/api/sales', require('./routes/sales'));
 app.use('/api/costs', require('./routes/costs'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 
+// SOLID FLEX module (additive, namespaced — safe to remove for rollback)
+app.use('/api/solidflex', require('./routes/solidflex'));
+
 // Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 NAFAS Server running on port ${PORT}`));
+// Listen only when run directly; exported for integration tests
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => console.log(`🚀 NAFAS Server running on port ${PORT}`));
+}
+
+module.exports = app;
