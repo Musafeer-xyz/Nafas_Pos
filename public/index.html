@@ -2,8 +2,7 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta charset="UTF-8" />    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NAFAS — POS System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
@@ -1218,10 +1217,89 @@
       justify-content: center;
       padding: 2rem;
     }
+
+    /* ── Offline banner ── */
+    #offline-banner {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      background: var(--danger);
+      color: #fff;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.45rem 0.75rem;
+    }
+
+    #offline-banner.show {
+      display: block;
+    }
+
+    /* ── Confirm-sale modal ── */
+    #confirm-sale-modal .confirm-summary {
+      max-height: 34vh;
+      overflow-y: auto;
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.25rem 0.6rem;
+      background: var(--dark-3);
+    }
+
+    .confirm-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .confirm-row:last-child {
+      border-bottom: none;
+    }
+
+    /* ── Mobile touch ergonomics ── */
+    .qty-btn,
+    .icon-btn {
+      min-width: 36px;
+      min-height: 36px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-sm {
+      min-height: 36px;
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+
+    .cart-item input[type="number"].form-input,
+    #override-price {
+      font-size: 16px;
+    }
+
+    .num-btn {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    @supports (padding: max(0px)) {
+      .bottom-nav {
+        padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
+      }
+
+      .topbar {
+        padding-top: max(0.6rem, env(safe-area-inset-top));
+      }
+    }
   </style>
 </head>
 
 <body>
+
+  <div id="offline-banner">📡 No internet connection — sales will not save until you're back online</div>
 
   <!-- ═══════════════════ LOGIN SCREEN ═══════════════════ -->
   <div id="login-screen">
@@ -1740,6 +1818,27 @@
   <!-- Toast -->
   <div id="toast"></div>
 
+  <!-- Confirm Sale Modal -->
+  <div class="modal-overlay" id="confirm-sale-modal">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Confirm Sale</div>
+      <div id="confirm-sale-summary" class="confirm-summary"></div>
+      <div class="flex-between">
+        <span class="text-muted" style="font-size:0.85rem">Total</span>
+        <span style="font-size:1.2rem;font-weight:700" id="confirm-sale-total">৳0</span>
+      </div>
+      <div class="flex-between mt-1">
+        <span class="text-muted" style="font-size:0.85rem">Net Profit</span>
+        <span class="text-success font-bold" id="confirm-sale-profit">৳0</span>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('confirm-sale-modal')">Keep Editing</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmSubmitSale()">✓ Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ===============================================
     //  CONFIG & STATE
@@ -1752,13 +1851,37 @@
     let userName = localStorage.getItem('nafas_name') || null;
     let userPerms = JSON.parse(localStorage.getItem('nafas_perms') || 'null');
     let currentView = 'dashboard';
-    let cart = [];
+    let cart = loadSavedCart();
     let allProducts = [];
     let allCombos = [];
     let overrideTarget = null;
     let allBranches = []; // loaded on init
     let activeBranchId = null; // null = main store
     let activeBranchName = 'Main Store';
+
+    // Persist cart so an accidental refresh/back doesn't lose a half-built sale
+    function saveCart() {
+      try { localStorage.setItem('nafas_cart', JSON.stringify({ items: cart, branchId: activeBranchId, branchName: activeBranchName })); } catch (e) { }
+    }
+
+    function loadSavedCart() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('nafas_cart') || 'null');
+        if (saved && Array.isArray(saved.items)) return saved.items;
+      } catch (e) { }
+      return [];
+    }
+
+    function restoreCartBranch() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('nafas_cart') || 'null');
+        if (saved && saved.branchId !== undefined && !userPerms?.assignedBranchId) {
+          activeBranchId = saved.branchId;
+          activeBranchName = saved.branchName || 'Main Store';
+        }
+        return Array.isArray(saved?.items) && saved.items.length > 0;
+      } catch (e) { return false; }
+    }
 
     // Permission helper - admin always true
     function can(perm) {
@@ -1819,17 +1942,27 @@
     }
 
     function logout() {
+      if (cart.length > 0 && !confirm(`You have ${cart.length} item(s) in an unsaved sale. Logging out will clear the cart. Log out anyway?`)) return;
       token = null; role = null; userName = null; userPerms = null;
       localStorage.removeItem('nafas_token');
       localStorage.removeItem('nafas_role');
       localStorage.removeItem('nafas_name');
       localStorage.removeItem('nafas_perms');
+      localStorage.removeItem('nafas_cart');
       cart = [];
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('app').style.display = 'none';
       pinBuffer = ''; updatePinDisplay();
       document.getElementById('login-error').textContent = '';
     }
+
+    // Warn before closing/reloading with an unsaved cart
+    window.addEventListener('beforeunload', (e) => {
+      if (cart.length > 0 && token) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
 
     // ===============================================
     //  API HELPERS
@@ -1849,6 +1982,23 @@
       return data;
     }
 
+    // ── Online / offline detection ──
+    function updateOnlineBanner() {
+      const banner = document.getElementById('offline-banner');
+      if (banner) banner.classList.toggle('show', !navigator.onLine);
+    }
+
+    window.addEventListener('online', () => {
+      updateOnlineBanner();
+      showToast('✓ Back online', 'success');
+    });
+
+    window.addEventListener('offline', () => {
+      updateOnlineBanner();
+      showToast('Connection lost — changes may not save', 'error');
+    });
+    updateOnlineBanner();
+
     // ===============================================
     //  APP INIT
     // ===============================================
@@ -1864,6 +2014,8 @@
     }
 
     async function loadBranchesAndInit() {
+      // Restore a half-built sale from before a refresh, before branch logic overrides the store
+      const restoredCart = restoreCartBranch();
       try {
         allBranches = await apiFetch('/api/branches') || [];
         // If user has assignedBranch, auto-select it
@@ -1879,6 +2031,10 @@
       }
       buildNav();
       navigateTo(role === 'admin' ? 'dashboard' : (can('sellMain') || can('sellBranch') ? 'sale' : 'stock'));
+      if (restoredCart) {
+        navigateTo('sale');
+        showToast('🛒 Restored your unfinished sale', 'success');
+      }
     }
 
     function buildNav() {
@@ -2195,6 +2351,7 @@
       activeBranchId = (branchId === 'null' || branchId === null) ? null : branchId;
       activeBranchName = branchName || 'Main Store';
       cart = [];
+      saveCart();
       renderSaleEntry();
     }
 
@@ -2288,6 +2445,7 @@
 
     function removeCartItem(idx) {
       cart.splice(idx, 1);
+      saveCart();
       renderCartItems();
     }
 
@@ -2398,6 +2556,7 @@
         });
       }
       closeModal('add-item-modal');
+      saveCart();
       renderCartItems();
       showToast(`✓ ${name} added to cart`, 'success');
     }
@@ -2422,6 +2581,7 @@
 
       if (isNaN(newQty) || newQty < minQty) return;
       item.qty = newQty;
+      saveCart();
       renderCartItems();
       updateCartTotal();
     }
@@ -2446,21 +2606,53 @@
       item.perMlPrice = price / item.qty;
       item.unitPrice = price;
       item.isOverridden = true;
+      saveCart();
       closeModal('override-modal');
       renderCartItems();
     }
 
+    // Remember customer & extra-cost fields between sales so back-to-back selling is fast
+    function collectSaleForm() {
+      return {
+        customerName: document.getElementById('sale-customer')?.value || '',
+        customerPhone: document.getElementById('sale-phone')?.value || '',
+        channel: document.getElementById('sale-channel')?.value || 'Direct',
+        notes: document.getElementById('sale-notes')?.value || '',
+        packaging: document.getElementById('ec-packaging')?.value || '',
+        delivery: document.getElementById('ec-delivery')?.value || '',
+        others: document.getElementById('ec-others')?.value || '',
+        otherNote: document.getElementById('ec-note')?.value || ''
+      };
+    }
+
+    function restoreSaleForm(f) {
+      if (!f) return;
+      const set = (id, v) => { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.value = v; };
+      set('sale-customer', f.customerName);
+      set('sale-phone', f.customerPhone);
+      set('sale-channel', f.channel);
+      set('sale-notes', f.notes);
+      set('ec-packaging', f.packaging);
+      set('ec-delivery', f.delivery);
+      set('ec-others', f.others);
+      set('ec-note', f.otherNote);
+      updateCartTotal();
+    }
+
+    let _pendingSale = null;
+
     async function submitSale() {
       if (cart.length === 0) return showToast('Add at least one item', 'error');
 
-      const body = {
-        customerName: document.getElementById('sale-customer').value || 'Walk-in',
-        customerPhone: document.getElementById('sale-phone').value || '',
-        channel: document.getElementById('sale-channel').value,
-        notes: document.getElementById('sale-notes').value,
+      const form = collectSaleForm();
+      _pendingSale = {
+        customerName: form.customerName || 'Walk-in',
+        customerPhone: form.customerPhone,
+        channel: form.channel,
+        notes: form.notes,
         branchId: activeBranchId || null,
         branchName: activeBranchName || 'Main Store',
-        date: document.getElementById('sale-date').value || new Date().toISOString(),
+        date: document.getElementById('sale-date')?.value || new Date().toISOString(),
         items: cart.map(i => ({
           itemId: i.itemId,
           itemType: i.itemType,
@@ -2468,22 +2660,54 @@
           overridePrice: i.unitPrice,
         })),
         extraCosts: {
-          packaging: parseFloat(document.getElementById('ec-packaging').value || 0),
-          delivery: parseFloat(document.getElementById('ec-delivery').value || 0),
-          others: parseFloat(document.getElementById('ec-others').value || 0),
-          otherNote: document.getElementById('ec-note').value || ''
+          packaging: parseFloat(form.packaging || 0),
+          delivery: parseFloat(form.delivery || 0),
+          others: parseFloat(form.others || 0),
+          otherNote: form.otherNote
         }
       };
 
-      console.log("Sending to Backend:", body.items);
+      // ── Review step: prevents accidental one-tap submissions ──
+      const costs = _pendingSale.extraCosts.packaging + _pendingSale.extraCosts.delivery + _pendingSale.extraCosts.others;
+      const lineTotal = i => i.isOverridden
+        ? i.unitPrice
+        : i.unit === 'piece'
+          ? i.unitPrice * i.qty
+          : (i.perMlPrice && i.itemType === 'Product') ? i.perMlPrice * i.qty : i.unitPrice;
+      const total = cart.reduce((s, i) => s + lineTotal(i), 0);
 
+      const summaryEl = document.getElementById('confirm-sale-summary');
+      summaryEl.innerHTML = `
+        <div class="confirm-row"><span>Customer</span><span>${_pendingSale.customerName}</span></div>
+        <div class="confirm-row"><span>Store</span><span>${activeBranchId ? `🏬 ${activeBranchName}` : '🏪 Main Store'}</span></div>
+        ${cart.map(i => `<div class="confirm-row">
+          <span>${i.name}${i.isOverridden ? ' <small style="color:var(--text-muted)">(custom price)</small>' : ''}</span>
+          <span>×${i.qty}${i.itemType === 'Combo' ? '' : (i.unit === 'piece' ? ' pcs' : ' ml')}
+            <b style="margin-left:0.3rem">৳${Math.round(lineTotal(i))}</b></span>
+        </div>`).join('')}
+        ${costs > 0 ? `<div class="confirm-row"><span>Extra costs</span><span style="color:var(--danger)">-৳${costs.toFixed(0)}</span></div>` : ''}
+      `;
+      document.getElementById('confirm-sale-total').textContent = `৳${total.toFixed(0)}`;
+      document.getElementById('confirm-sale-profit').textContent = `৳${(total - costs).toFixed(0)}`;
+      openModal('confirm-sale-modal');
+    }
+
+    async function confirmSubmitSale() {
+      if (!_pendingSale) { closeModal('confirm-sale-modal'); return; }
       try {
-        await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(body) });
+        await apiFetch('/api/sales', { method: 'POST', body: JSON.stringify(_pendingSale) });
         const soldItems = [...cart]; // save copy BEFORE clearing
         cart = [];
+        saveCart();
         deductBottlesAfterSale(soldItems); // use the saved copy
-        showToast(`✓ ${activeSaleStore === 'tanjim' ? "Tanjim's sale" : 'Sale'} recorded!`, 'success');
+        // Keep customer info & extra costs so the next sale is faster to fill
+        localStorage.setItem('nafas_sale_draft', JSON.stringify(collectSaleForm()));
+        _pendingSale = null;
+        closeModal('confirm-sale-modal');
+        showToast('✓ Sale recorded!', 'success');
         renderSaleEntry();
+        const draft = JSON.parse(localStorage.getItem('nafas_sale_draft') || 'null');
+        setTimeout(() => restoreSaleForm(draft), 60);
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -2798,6 +3022,18 @@
 
     function deleteBottle(idx) {
       const bottles = JSON.parse(localStorage.getItem('nafas_bottles') || '[]');
+      const removed = bottles[idx];
+      // Return the deleted purchase's bottles out of running stock too
+      if (removed) {
+        const stock = JSON.parse(localStorage.getItem('nafas_bottle_stock') || '{}');
+        (removed.sizes || []).forEach(s => {
+          const key = String(s.size);
+          if (stock[key] !== undefined) {
+            stock[key] = Math.max(0, stock[key] - s.qty);
+            localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
+          }
+        });
+      }
       bottles.splice(idx, 1);
       localStorage.setItem('nafas_bottles', JSON.stringify(bottles));
       renderBottles();
@@ -2855,6 +3091,9 @@
     // ===============================================
     //  SALE HISTORY (Admin)
     // ===============================================
+    let _salesCache = [];
+    let _historySearch = '';
+
     async function renderHistory() {
       const el = document.getElementById('main-content');
       el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
@@ -2862,11 +3101,40 @@
       try {
         const sales = await apiFetch('/api/sales');
         if (!sales) return;
+        _salesCache = sales;
 
         el.innerHTML = `
+      <div class="search-wrap" style="margin-bottom:0.75rem">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="history-search" placeholder="Search customer, item, channel..."
+          value="${_historySearch}" oninput="_historySearch=this.value;renderHistoryList()" />
+      </div>
+      <div id="history-list"></div>
+    `;
+        renderHistoryList();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderHistoryList() {
+      const el = document.getElementById('history-list');
+      if (!el) return;
+
+      const q = _historySearch.trim().toLowerCase();
+      const sales = q
+        ? _salesCache.filter(s =>
+          (s.customerName || '').toLowerCase().includes(q) ||
+          (s.channel || '').toLowerCase().includes(q) ||
+          (s.branchName || '').toLowerCase().includes(q) ||
+          (s.soldBy || '').toLowerCase().includes(q) ||
+          (s.items || []).some(i => (i.name || '').toLowerCase().includes(q)))
+        : _salesCache;
+
+      el.innerHTML = `
       <div class="card">
-        <div class="card-title">${icon('history')}Sales History</div>
-        ${sales.length === 0 ? `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-text">No sales yet</div></div>` :
+        <div class="card-title">${icon('history')}Sales History ${q ? `(${sales.length} match${sales.length === 1 ? '' : 'es'})` : ''}</div>
+        ${sales.length === 0 ? `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-text">${q ? 'No sales match your search' : 'No sales yet'}</div></div>` :
             sales.map(s => `
             <div class="sale-row">
               <div class="sale-row-top">
@@ -2891,9 +3159,6 @@
           `).join('')}
       </div>
     `;
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
     }
 
     async function deleteSale(id) {
@@ -2901,6 +3166,7 @@
       try {
         await apiFetch(`/api/sales/${id}`, { method: 'DELETE' });
         showToast('Sale deleted, stock restored', 'success');
+        _historySearch = '';
         renderHistory();
       } catch (err) {
         showToast(err.message, 'error');
@@ -3461,18 +3727,15 @@
             branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
               branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
             if (u.assignedBranch) branchSel.value = u.assignedBranch;
-          } else {
-            ['u-name', 'u-pin'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('u-grade').value = '';
-            const branches = await apiFetch('/api/branches') || [];
-            const branchSel = document.getElementById('u-branch');
-            branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
-              branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
-            branchSel.value = '';
+            // Restore saved permissions & PIN placeholder on edit
             ALL_PERMS.forEach(p => {
               const el = document.getElementById(`perm-${p.key}`);
               if (el) el.checked = !!(u.permissions?.[p.key]);
             });
+            const pinEl = document.getElementById('u-pin');
+            if (pinEl) pinEl.placeholder = 'Leave blank to keep current PIN';
+          } else {
+            ['u-name', 'u-pin'].forEach(id => document.getElementById(id).value = '');
           }
         } catch (e) { }
       }
@@ -3997,7 +4260,6 @@
       });
 
       localStorage.setItem('nafas_bottle_stock', JSON.stringify(stock));
-      console.log('Bottle stock after sale:', stock); // debug
     }
 
   </script>
