@@ -205,6 +205,8 @@ describe('role permissions (server-side gating)', () => {
     assert.equal(profit.body.cost, undefined, 'cost field must be stripped server-side');
 
     assert.equal((await api(seller.token, 'POST', '/api/solidflex/master', { kind: 'color', value: 'RED' })).status, 403);
+    // but sellers CAN read master lists (needed for PID autofill on the sell screen)
+    assert.equal((await api(seller.token, 'GET', '/api/solidflex/master')).status, 200);
     assert.equal((await api(seller.token, 'GET', '/api/solidflex/expenses')).status, 403);
     assert.equal((await api(seller.token, 'GET', '/api/solidflex/shipments')).status, 403);
     assert.equal((await api(seller.token, 'PATCH', `/api/solidflex/sales/${sell.body.serial}/status`, { status: 'voided' })).status, 403);
