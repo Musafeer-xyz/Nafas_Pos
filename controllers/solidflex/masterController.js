@@ -64,8 +64,15 @@ exports.update = async (req, res) => {
     if (value !== undefined) {
       const clean = String(value).trim().toUpperCase();
       if (!clean) return res.status(400).json({ message: 'value cannot be empty' });
-      const dupe = await SfMaster.findOne({ kind: item.kind, value: clean, _id: { $ne: item._id } }).lean();
-      if (dupe) return res.status(409).json({ message: `"${clean}" already exists in ${item.kind} list` });
+      if (clean !== item.value) {
+        // Renaming would orphan products + stock/sales history that reference the old value.
+        const inUse = await SfProduct.countDocuments({ [item.kind]: item.value });
+        if (inUse > 0) {
+          return res.status(409).json({ message: `Cannot rename "${item.value}" — ${inUse} product(s) use it. Deactivate it and create the new value instead.` });
+        }
+        const dupe = await SfMaster.findOne({ kind: item.kind, value: clean, _id: { $ne: item._id } }).lean();
+        if (dupe) return res.status(409).json({ message: `"${clean}" already exists in ${item.kind} list` });
+      }
       item.value = clean;
     }
     if (note !== undefined) item.note = String(note).slice(0, 200);

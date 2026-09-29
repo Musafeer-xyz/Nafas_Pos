@@ -23,7 +23,7 @@ const SF_ROLE_PRESETS = {
     sfSell: true,
     sfManageShipments: true,
     sfManageMasters: true,
-    sfManageExpenses: true,
+    sfManageExpenses: false, // expenses/cost data is Owner-only per spec §5
     sfViewProfit: false, // cost/profit hidden for managers per spec
     sfVoid: true,
   },

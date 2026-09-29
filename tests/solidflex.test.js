@@ -132,6 +132,22 @@ describe('SOLID FLEX API', () => {
     assert.match(r.body.message, /color master list/);
   });
 
+  test('master value rename blocked while products reference it; unused renames fine', async () => {
+    const masters = await api(owner.token, 'GET', '/api/solidflex/master?kind=color');
+    const black = masters.body.find(m => m.value === 'BLACK');
+    const blocked = await api(owner.token, 'PUT', `/api/solidflex/master/${black._id}`, { value: 'JETBLACK' });
+    assert.equal(blocked.status, 409);
+    assert.match(blocked.body.message, /product\(s\) use it/);
+
+    // unused value can be renamed
+    await api(owner.token, 'POST', '/api/solidflex/master', { kind: 'size', value: 'XXL' });
+    const sizes = await api(owner.token, 'GET', '/api/solidflex/master?kind=size');
+    const xxl = sizes.body.find(m => m.value === 'XXL');
+    const ok = await api(owner.token, 'PUT', `/api/solidflex/master/${xxl._id}`, { value: 'XXL2' });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.value, 'XXL2');
+  });
+
   test('sale over stock is rejected; stock stays consistent', async () => {
     await api(owner.token, 'POST', '/api/solidflex/shipments', { pid: 'TSHIRT-BLACK-ABC-M', qty: 3 });
     const r = await api(owner.token, 'POST', '/api/solidflex/sales', { pid: 'TSHIRT-BLACK-ABC-M', qty: 2 });
@@ -208,6 +224,12 @@ describe('role permissions (server-side gating)', () => {
     // but sellers CAN read master lists (needed for PID autofill on the sell screen)
     assert.equal((await api(seller.token, 'GET', '/api/solidflex/master')).status, 200);
     assert.equal((await api(seller.token, 'GET', '/api/solidflex/expenses')).status, 403);
+    // revenue endpoint must not leak cost data either
+    const sellerRev = await api(seller.token, 'GET', '/api/solidflex/reports/revenue');
+    assert.equal(sellerRev.body.overhead, undefined, 'overhead must be stripped for non-owners');
+    // team: seller sees only own row
+    const team = await api(seller.token, 'GET', '/api/solidflex/reports/team');
+    assert.ok(team.body.every(r => r.seller === 'Rana'), 'seller team view must contain only own row');
     assert.equal((await api(seller.token, 'GET', '/api/solidflex/shipments')).status, 403);
     assert.equal((await api(seller.token, 'PATCH', `/api/solidflex/sales/${sell.body.serial}/status`, { status: 'voided' })).status, 403);
 
@@ -220,10 +242,16 @@ describe('role permissions (server-side gating)', () => {
     const rev = await api(manager.token, 'GET', '/api/solidflex/reports/revenue');
     assert.equal(rev.status, 200);
     assert.equal(rev.body.profit, undefined);
+    assert.equal(rev.body.overhead, undefined, 'overhead is cost data — hidden from managers too');
+
+    // manager preset: expenses NOT manageable (owner-only)
+    assert.equal((await api(manager.token, 'POST', '/api/solidflex/expenses', { scope: 'overhead', amount: 100 })).status, 403);
 
     assert.equal((await api(manager.token, 'GET', '/api/solidflex/audit')).status, 403);
-    // managers CAN manage shipments & masters
+    // managers CAN manage shipments & masters, and see the full team view
     assert.equal((await api(manager.token, 'GET', '/api/solidflex/shipments')).status, 200);
+    const mTeam = await api(manager.token, 'GET', '/api/solidflex/reports/team');
+    assert.ok(Array.isArray(mTeam.body));
   });
 
   test('owner sees full profit picture', async () => {

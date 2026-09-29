@@ -29,25 +29,34 @@ exports.revenue = async (req, res) => {
     const units = sales.reduce((s, x) => s + x.qty, 0);
     const cogs = sales.reduce((s, x) => s + (x.unitCost || 0) * x.qty, 0);
 
+    const base = { revenue, units, salesCount: sales.length };
+    if (!canViewProfit(req.user)) return res.json(base); // cost data (incl. overhead) never leaves the server for non-owners
+
+    // Owner-only path: fetch expenses here so non-owners never trigger the query
     const expenseMatch = { voided: false };
     if (Object.keys(range).length) expenseMatch.date = range;
     const expenses = await SfExpense.find(expenseMatch).lean();
     const overhead = expenses.filter(e => e.scope === 'overhead').reduce((s, e) => s + e.amount, 0);
-
-    const base = { revenue, units, salesCount: sales.length, overhead };
-    if (!canViewProfit(req.user)) return res.json(base); // cost/profit never leave the server
-
     const perPidCost = expenses.filter(e => e.scope === 'per_pid').reduce((s, e) => s + e.amount, 0);
     const cost = cogs + overhead + perPidCost;
-    return res.json({ ...base, cogs, perPidCost, cost, profit: revenue - cost });
+    return res.json({ ...base, cogs, overhead, perPidCost, cost, profit: revenue - cost });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
 // GET /api/solidflex/reports/team?from=&to=
+// Sellers may only see their own row; managers/owners see all.
 exports.team = async (req, res) => {
   try {
+    const isSellerOnly = req.user.role !== 'admin' && !req.user.permissions?.sfViewProfit && !req.user.permissions?.sfManageShipments;
+    if (isSellerOnly) {
+      const mine = await SfSale.aggregate([
+        { $match: { seller: req.user.name, status: 'active' } },
+        { $group: { _id: '$seller', unitsSold: { $sum: '$qty' }, totalSalesValue: { $sum: { $multiply: ['$price', '$qty'] } }, salesCount: { $sum: 1 }, lastSaleAt: { $max: '$date' } } },
+      ]);
+      return res.json(mine.map(r => ({ seller: r._id, unitsSold: r.unitsSold, totalSalesValue: r.totalSalesValue, cashCollected: r.totalSalesValue, salesCount: r.salesCount, lastSaleAt: r.lastSaleAt })));
+    }
     const match = { status: 'active' };
     const range = dateRange(req.query);
     if (Object.keys(range).length) match.date = range;

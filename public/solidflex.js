@@ -61,7 +61,11 @@
       },
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+    if (!res.ok) {
+      const err = new Error(data.message || `Request failed (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
     return data;
   }
 
@@ -90,6 +94,7 @@
   // ── Data loading ──
   async function loadMasters() {
     const items = await api('/master');
+    S._allMasters = items; // full list incl. inactive (Master screen)
     S.masters = { type: [], color: [], design: [], size: [] };
     for (const m of items) {
       if (m.isActive && S.masters[m.kind]) S.masters[m.kind].push(m.value);
@@ -148,7 +153,7 @@
       { id: 'sell', icon: '🛒', perm: null },
       { id: 'stock', icon: '📦', perm: null },
       { id: 'shipment', icon: '🚚', perm: 'sfManageShipments' },
-      { id: 'cost', icon: '💸', perm: 'sfManageExpenses', adminOnly: true },
+      { id: 'cost', icon: '💸', adminOnly: true }, // expenses are Owner-only (server enforces too)
       { id: 'revenue', icon: '📈', perm: null },
       { id: 'team', icon: '👥', perm: null },
       { id: 'master', icon: '🧩', perm: 'sfManageMasters' },
@@ -361,6 +366,18 @@
       rows = S._shipments || [];
       cols = ['date', 'pid', 'qty', 'note', 'receivedBy', 'voided'];
       name = 'SF_Shipments';
+    } else if (kind === 'expenses') {
+      rows = S._expenses || [];
+      cols = ['date', 'scope', 'pid', 'category', 'amount', 'voided', 'note'];
+      name = 'SF_Expenses';
+    } else if (kind === 'team') {
+      rows = S._team || [];
+      cols = ['seller', 'unitsSold', 'totalSalesValue', 'cashCollected', 'salesCount'];
+      name = 'SF_Team';
+    } else if (kind === 'revenue') {
+      rows = S._revenue ? [S._revenue] : [];
+      cols = ['revenue', 'units', 'salesCount', 'cogs', 'overhead', 'perPidCost', 'cost', 'profit'];
+      name = 'SF_Revenue';
     } else return;
     const escCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [cols.join(','), ...rows.map(r => cols.map(c => escCsv(r[c])).join(','))].join('\n');
@@ -372,20 +389,654 @@
     URL.revokeObjectURL(a.href);
   }
 
+  // ═══════════════ shared date-range helper ═══════════════
+  function rangeParams(preset, custom = {}) {
+    const now = new Date();
+    const fmt = (d) => d.toISOString().split('T')[0];
+    if (preset === 'today') return { from: fmt(now), to: fmt(now) };
+    if (preset === 'week') { const s = new Date(now); s.setDate(now.getDate() - 6); return { from: fmt(s), to: fmt(now) }; }
+    if (preset === 'month') return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) };
+    if (preset === 'custom') return { from: custom.from || '', to: custom.to || '' };
+    return {}; // all
+  }
+
+  function rangeBarHtml(state) {
+    return `
+      <div class="period-tabs">
+        ${['today', 'week', 'month', 'all'].map(p => `<button class="period-tab ${state.preset === p ? 'active' : ''}" data-sf-range="${p}">${{ today: 'Today', week: '7 Days', month: 'This Month', all: 'All' }[p]}</button>`).join('')}
+      </div>`;
+  }
+
+  // ═══════════════ VIEW: COST (Owner only) ═══════════════
+  async function renderCost() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._costState) S._costState = { preset: 'month', from: '', to: '' };
+    const st = S._costState;
+
+    try {
+      await loadProducts().catch(() => { });
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const expenses = await api('/expenses?' + q.toString());
+      S._expenses = expenses;
+      const perPid = expenses.filter(e => e.scope === 'per_pid');
+      const overhead = expenses.filter(e => e.scope === 'overhead');
+      const sum = (l) => l.filter(e => !e.voided).reduce((s, e) => s + e.amount, 0);
+
+      const expRow = (e) => `
+        <div class="sf-card">
+          <div class="sf-card-top">
+            <div class="sf-card-pid">${esc(e.scope === 'per_pid' ? e.pid : e.category)}</div>
+            <div style="display:flex;align-items:center;gap:0.4rem">
+              <b style="color:var(--danger)">${money(e.amount)}</b>
+              ${e.voided ? '<span class="sf-stock-chip low">VOID</span>' : `<button class="btn btn-danger btn-sm sf-void-btn" data-sf-void-exp="${e._id}">✕</button>`}
+            </div>
+          </div>
+          <div class="sf-card-meta">${new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${esc(e.category)}${e.note ? ' · ' + esc(e.note) : ''}</div>
+        </div>`;
+
+      const pidOptions = S.products.filter(p => p.isActive).map(p => `<option value="${esc(p.pid)}">${esc(p.pid)}</option>`).join('');
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div>
+            <div class="sf-title">💸 ${t('cost')} <span class="sf-badge">Owner</span></div>
+            <div class="sf-sub">Per-PID: ${money(sum(perPid))} · Overhead: ${money(sum(overhead))}</div>
+          </div>
+          <div class="sf-actions"><button class="btn btn-outline btn-sm" data-sf-export="expenses">⬇ CSV</button></div>
+        </div>
+        ${rangeBarHtml(st)}
+
+        <div class="card sf-card">
+          <div class="card-title">➕ Record Expense</div>
+          <div class="sf-cascade">
+            <div>
+              <label class="form-label">Type</label>
+              <select class="form-select" id="sf-cx-scope">
+                <option value="overhead">Overhead (ads, rent, shipping…)</option>
+                <option value="per_pid">Per-PID (cost tied to one product)</option>
+              </select>
+            </div>
+            <div id="sf-cx-pidbox" style="display:none">
+              <label class="form-label">${t('pid')}</label>
+              <select class="form-select" id="sf-cx-pid"><option value="">—</option>${pidOptions}</select>
+            </div>
+          </div>
+          <div class="sf-cascade" style="margin-top:0.5rem">
+            <div>
+              <label class="form-label">Amount ৳</label>
+              <input class="form-input" type="number" id="sf-cx-amount" min="1" placeholder="0" />
+            </div>
+            <div>
+              <label class="form-label">Category</label>
+              <select class="form-select" id="sf-cx-cat">
+                ${['Shipping', 'Ads', 'Rent', 'Utilities', 'Salary', 'Packaging', 'Photoshoot', 'Maintenance', 'Other'].map(c => `<option>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:0.5rem">
+            <label class="form-label">${t('note')}</label>
+            <input class="form-input" id="sf-cx-note" placeholder="Optional" />
+          </div>
+          <div class="sf-field-err" id="sf-cx-err"></div>
+          <button class="btn btn-primary btn-block" id="sf-cx-save" style="margin-top:0.5rem">✓ ${t('save')}</button>
+        </div>
+
+        <div class="card sf-card"><div class="card-title">Per-PID costs (${perPid.length})</div>
+          ${perPid.length ? perPid.map(expRow).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+        <div class="card sf-card"><div class="card-title">Overhead (${overhead.length})</div>
+          ${overhead.length ? overhead.map(expRow).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+        <div class="sf-saved" id="sf-saved"></div>
+      </div>`;
+
+      el('sf-cx-scope').addEventListener('change', () => {
+        el('sf-cx-pidbox').style.display = el('sf-cx-scope').value === 'per_pid' ? '' : 'none';
+      });
+      el('sf-cx-save').onclick = saveExpense;
+    } catch (err) {
+      if (err.status === 403) {
+        wrap.innerHTML = `<div class="sf-wrap"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem">🔒</div><div style="margin-top:0.5rem">Expenses are Owner-only</div></div></div>`;
+      } else showToast(err.message, 'error');
+    }
+  }
+
+  async function saveExpense() {
+    const errEl = el('sf-cx-err');
+    errEl.textContent = '';
+    const scope = el('sf-cx-scope').value;
+    const amount = Number(el('sf-cx-amount').value);
+    const pid = scope === 'per_pid' ? el('sf-cx-pid').value : null;
+    if (!Number.isFinite(amount) || amount <= 0) { errEl.textContent = 'Amount must be greater than 0'; return; }
+    if (scope === 'per_pid' && !pid) { errEl.textContent = 'Pick a PID'; return; }
+    try {
+      await api('/expenses', { method: 'POST', body: JSON.stringify({ scope, pid, amount, category: el('sf-cx-cat').value, note: el('sf-cx-note').value }) });
+      setSaved();
+      showToast('✓ Expense saved', 'success');
+      renderCost();
+    } catch (err) { errEl.textContent = err.message; }
+  }
+
+  async function voidExpense(id) {
+    if (!confirm('Void this expense? It will no longer count in profit.')) return;
+    try {
+      await api(`/expenses/${id}/void`, { method: 'PATCH' });
+      showToast('Expense voided', 'success');
+      renderCost();
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  // ═══════════════ VIEW: REVENUE ═══════════════
+  async function renderRevenue() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._revState) S._revState = { preset: 'month', from: '', to: '' };
+    const st = S._revState;
+
+    try {
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const data = await api('/reports/revenue?' + q.toString());
+      const isOwner = role === 'admin' || !!userPerms?.sfViewProfit;
+
+      const stat = (label, val, cls = '') => `
+        <div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}">${val}</div></div>`;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">📈 ${t('revenue')}</div>
+          <div class="sf-sub">${data.salesCount} sales · ${data.units} units</div></div>
+          ${isOwner ? '<button class="btn btn-outline btn-sm" data-sf-export="revenue">⬇ CSV</button>' : ''}
+        </div>
+        ${rangeBarHtml(st)}
+        <div class="stat-grid">
+          ${stat('Revenue', money(data.revenue))}
+          ${stat('Units', data.units)}
+          ${isOwner ? stat('Cost', money(data.cost), 'danger') : ''}
+          ${isOwner ? stat('Net Profit', money(data.profit), 'success') : ''}
+        </div>
+        ${isOwner && data.salesCount + (data.overhead || 0) + (data.perPidCost || 0) > 0 && data.cost !== undefined ? `
+          <div class="card sf-card"><div class="card-title">Where cost comes from</div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Product cost (COGS)</span><b>${money(data.cogs)}</b></div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Overhead</span><b>${money(data.overhead)}</b></div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Per-PID costs</span><b>${money(data.perPidCost)}</b></div>
+            <hr class="divider"/>
+            <div class="flex-between"><span class="font-bold">Profit = Revenue − Cost</span><b class="text-success">${money(data.profit)}</b></div>
+          </div>` : ''}
+        ${!isOwner ? `<div class="sf-hint" style="text-align:center">Cost & profit visible to Owner only</div>` : ''}
+      </div>`;
+      S._revenue = data;
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ═══════════════ VIEW: TEAM ═══════════════
+  async function renderTeam() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._teamState) S._teamState = { preset: 'month', from: '', to: '' };
+    const st = S._teamState;
+
+    try {
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const rows = await api('/reports/team?' + q.toString());
+      S._team = rows;
+      const isSellerOnly = role !== 'admin' && !userPerms?.sfViewProfit && !userPerms?.sfManageShipments;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">👥 ${t('team')}</div>
+          <div class="sf-sub">${isSellerOnly ? 'Your performance' : rows.length + ' sellers'}</div></div>
+          <div class="sf-actions"><button class="btn btn-outline btn-sm" data-sf-export="team">⬇ CSV</button></div>
+        </div>
+        ${rangeBarHtml(st)}
+        <div id="sf-team-body" style="min-height:200px"></div>
+      </div>`;
+
+      const colDefs = [
+        { headerName: t('seller'), field: 'seller', flex: 1.4, minWidth: 130, cellRenderer: p => esc(p.value) },
+        { headerName: 'Units', field: 'unitsSold', width: 100, type: 'rightAligned', sort: 'desc' },
+        { headerName: 'Sales Value', field: 'totalSalesValue', width: 140, type: 'rightAligned', valueFormatter: p => money(p.value) },
+        { headerName: 'Cash Collected', field: 'cashCollected', width: 150, type: 'rightAligned', valueFormatter: p => money(p.value) },
+        { headerName: '# Sales', field: 'salesCount', width: 100, type: 'rightAligned' },
+        { headerName: 'Last Sale', field: 'lastSaleAt', width: 130, valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—' },
+      ];
+
+      gridOrCards(
+        el('sf-team-body'),
+        { columnDefs: colDefs, rowData: rows },
+        () => rows.map(r => `
+          <div class="sf-card">
+            <div class="sf-card-top"><div class="sf-card-pid">${esc(r.seller)}</div>
+            <span class="sf-stock-chip ok">${r.unitsSold} units</span></div>
+            <div class="sf-card-meta">Sold ${money(r.totalSalesValue)} · ${r.salesCount} sales</div>
+          </div>`).join('') || `<div class="empty-state"><div class="empty-text">${t('noData')}</div></div>`
+      );
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ═══════════════ VIEW: DASHBOARD ═══════════════
+  async function renderDashboard() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    try {
+      const d = await api('/reports/dashboard');
+      S._dash = d;
+      const isOwner = role === 'admin' || !!userPerms?.sfViewProfit;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">📊 ${t('dashboard')}</div>
+          <div class="sf-sub">This month</div></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Sales (month)</div><div class="stat-value">${d.salesThisMonth}</div></div>
+          <div class="stat-card"><div class="stat-label">Revenue (month)</div><div class="stat-value">${money(d.revenueThisMonth)}</div></div>
+          ${isOwner ? `<div class="stat-card"><div class="stat-label">Profit (month)</div><div class="stat-value success">${money(d.profitThisMonth)}</div></div>` : ''}
+          <div class="stat-card"><div class="stat-label">Units in Stock</div><div class="stat-value">${d.unitsInStock}</div></div>
+        </div>
+
+        ${d.lowStock.length ? `
+        <div class="alert-banner">⚠️ ${d.lowStock.length} PID(s) low on stock
+          ${d.lowStock.slice(0, 5).map(l => `<br>• ${esc(l.pid)}: ${l.stock} left`).join('')}
+          ${d.lowStock.length > 5 ? `<br>…and ${d.lowStock.length - 5} more` : ''}
+        </div>` : ''}
+
+        ${d.topProducts.length ? `
+        <div class="card sf-card"><div class="card-title">🏆 Top Products</div>
+          ${d.topProducts.map((p, i) => `
+            <div class="flex-between" style="padding:0.35rem 0">
+              <span style="font-size:0.85rem">${i + 1}. ${esc(p._id)}</span>
+              <span><b>${p.units}</b> units · <span class="text-gold">${money(p.revenue)}</span></span>
+            </div>`).join('')}
+        </div>` : ''}
+
+        <div class="card sf-card"><div class="card-title">${t('history')}</div>
+          ${d.recentSales.length ? d.recentSales.map(s => `
+            <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid var(--border)">
+              <div><b style="font-size:0.82rem">${esc(s.serial)}</b> <span class="sf-hint">${esc(s.pid)}</span></div>
+              <div style="text-align:right"><b>${money(s.price * s.qty)}</b><div class="sf-hint">${esc(s.seller)} · ${new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}${s.status !== 'active' ? ` · ${s.status.toUpperCase()}` : ''}</div></div>
+            </div>`).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+      </div>`;
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ═══════════════ VIEW: MASTER (Owner/Manager) ═══════════════
+  async function renderMaster(tab = S._masterTab || 'attrs') {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    S._masterTab = tab;
+
+    try {
+      if (tab === 'attrs') await loadMasters();
+      else await Promise.all([loadMasters(), loadProducts()]);
+
+      const tabsHtml = `
+        <div class="period-tabs">
+          <button class="period-tab ${tab === 'attrs' ? 'active' : ''}" data-sf-mtab="attrs">Lists (Type/Color/Design/Size)</button>
+          <button class="period-tab ${tab === 'pids' ? 'active' : ''}" data-sf-mtab="pids">PID Products</button>
+          <button class="period-tab ${tab === 'import' ? 'active' : ''}" data-sf-mtab="import">📥 Import</button>
+        </div>`;
+
+      const bodyHtml = tab === 'attrs' ? masterAttrsHtml() : tab === 'pids' ? masterPidsHtml() : masterImportHtml();
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">🧩 ${t('master')}</div>
+          <div class="sf-sub">${tab === 'attrs' ? 'The four attribute lists — PIDs are built from these' : tab === 'pids' ? 'Every sellable variant' : 'Bring your existing sheet data in'}</div></div>
+        </div>
+        ${tabsHtml}
+        <div class="sf-saved" id="sf-saved"></div>
+        ${bodyHtml}
+      </div>`;
+
+      if (tab === 'attrs') wireMasterAttrs();
+      else if (tab === 'pids') wireMasterPids();
+      else wireMasterImport();
+    } catch (err) {
+      if (err.status === 403) {
+        wrap.innerHTML = `<div class="sf-wrap"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem">🔒</div><div style="margin-top:0.5rem">Master data is Manager/Owner-only</div></div></div>`;
+      } else showToast(err.message, 'error');
+    }
+  }
+
+  // ── Tab 1: attribute lists ──
+  function masterAttrsHtml() {
+    const kinds = ['type', 'color', 'design', 'size'];
+    return `
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap">
+        ${kinds.map(k => `<select class="form-select" id="sf-ma-new-${k}" style="flex:1;min-width:120px" placeholder="New ${k}"><option value="">+ new ${k}</option></select>`).join('')}
+        <input class="form-input" id="sf-ma-note" style="flex:1;min-width:140px" placeholder="Note (optional)" />
+        <button class="btn btn-primary btn-sm" id="sf-ma-add">Add</button>
+      </div>
+      <div class="sf-hint" style="margin-bottom:0.5rem">Type the new value into the box of its kind (e.g. "NAVY" under color), then Add. Values used by products cannot be renamed or deleted — only deactivated.</div>
+      ${kinds.map(k => `
+        <div class="card sf-card">
+          <div class="card-title">${k.toUpperCase()} <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(${S.masters[k].filter(v => true).length || 0})</span></div>
+          <div id="sf-ma-list-${k}">
+            ${(S._allMasters || []).filter(m => m.kind === k).map(m => `
+              <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid var(--border)">
+                <div>
+                  <b style="font-size:0.85rem;${m.isActive ? '' : 'color:var(--text-muted);text-decoration:line-through'}">${esc(m.value)}</b>
+                  ${m.note ? `<span class="sf-hint"> · ${esc(m.note)}</span>` : ''}
+                  ${!m.isActive ? '<span class="sf-stock-chip low" style="margin-left:0.3rem">inactive</span>' : ''}
+                </div>
+                <div style="display:flex;gap:0.3rem">
+                  ${m.isActive
+                    ? `<button class="btn btn-outline btn-sm" data-sf-ma-edit="${m._id}">Rename</button>
+                       <button class="btn btn-danger btn-sm" data-sf-ma-deact="${m._id}">Deactivate</button>`
+                    : `<button class="btn btn-outline btn-sm" data-sf-ma-react="${m._id}">Reactivate</button>`}
+                </div>
+              </div>`).join('') || `<div class="sf-hint">${t('noData')}</div>`}
+          </div>
+        </div>`).join('')}`;
+  }
+
+  function wireMasterAttrs() {
+    // populate the 4 "new value" inputs as free-text datalist combos
+    ['type', 'color', 'design', 'size'].forEach(k => {
+      const sel = el(`sf-ma-new-${k}`);
+      if (!sel) return;
+      // allow free text: replace select with input+datalist behavior
+      const wrapIn = document.createElement('div');
+      wrapIn.innerHTML = `<input class="form-input" list="sf-ma-dl-${k}" id="sf-ma-new-${k}" placeholder="new ${k}" style="width:100%" />
+        <datalist id="sf-ma-dl-${k}">${S.masters[k].map(v => `<option value="${esc(v)}"></option>`).join('')}</datalist>`;
+      sel.replaceWith(wrapIn.firstChild);
+    });
+
+    el('sf-ma-add').onclick = async () => {
+      const kinds = ['type', 'color', 'design', 'size'];
+      const entries = kinds.map(k => ({ k, v: el(`sf-ma-new-${k}`).value.trim() })).filter(x => x.v);
+      if (!entries.length) return showToast('Type a value in a box first', 'error');
+      let okCount = 0;
+      for (const { k, v } of entries) {
+        try {
+          const r = await api('/master', { method: 'POST', body: JSON.stringify({ kind: k, value: v, note: el('sf-ma-note')?.value || '' }) });
+          if (r.reactivated) showToast(`${v} reactivated`, 'success'); else okCount++;
+        } catch (err) { showToast(`${k}/${v}: ${err.message}`, 'error'); }
+      }
+      if (okCount) { setSaved(`✓ ${okCount} added`); showToast(`✓ ${okCount} value(s) added`, 'success'); }
+      renderMaster('attrs');
+    };
+
+    document.querySelectorAll('[data-sf-ma-edit]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.sfMaEdit;
+      const cur = (S._allMasters || []).find(m => m._id === id);
+      const v = prompt('Rename value (only allowed while no product uses it):', cur?.value || '');
+      if (!v || v === cur?.value) return;
+      try { await api(`/master/${id}`, { method: 'PUT', body: JSON.stringify({ value: v }) }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+
+    document.querySelectorAll('[data-sf-ma-deact]').forEach(b => b.onclick = async () => {
+      if (!confirm('Deactivate this value? It stays in history but disappears from the pickers.')) return;
+      try { await api(`/master/${b.dataset.sfMaDeact}/deactivate`, { method: 'PUT' }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+
+    document.querySelectorAll('[data-sf-ma-react]').forEach(b => b.onclick = async () => {
+      try { await api(`/master/${b.dataset.sfMaReact}`, { method: 'PUT', body: JSON.stringify({ isActive: true }) }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+  }
+
+  // ── Tab 2: PID products ──
+  function masterPidsHtml() {
+    const rows = S.products;
+    return `
+      <div class="card sf-card">
+        <div class="card-title">➕ New Product (auto-builds PID)</div>
+        <div class="sf-cascade">
+          <div><label class="form-label">${t('type')}</label><select class="form-select" id="sf-mp-type"><option value="">—</option>${S.masters.type.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('color')}</label><select class="form-select" id="sf-mp-color"><option value="">—</option>${S.masters.color.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('design')}</label><select class="form-select" id="sf-mp-design"><option value="">—</option>${S.masters.design.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('size')}</label><select class="form-select" id="sf-mp-size"><option value="">—</option>${S.masters.size.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+        </div>
+        <div class="sf-cascade" style="margin-top:0.5rem">
+          <div><label class="form-label">${t('unitCost')} ৳</label><input class="form-input" type="number" id="sf-mp-cost" min="0" placeholder="0" /></div>
+          <div><label class="form-label">${t('price')} ৳</label><input class="form-input" type="number" id="sf-mp-price" min="0" placeholder="0" /></div>
+          <div><label class="form-label">Alert ≤</label><input class="form-input" type="number" id="sf-mp-low" min="0" placeholder="5" /></div>
+        </div>
+        <div class="sf-hint" id="sf-mp-preview" style="margin-top:0.4rem"></div>
+        <div class="sf-field-err" id="sf-mp-err"></div>
+        <button class="btn btn-primary btn-block" id="sf-mp-add" style="margin-top:0.5rem">✓ Add Product</button>
+      </div>
+      <div id="sf-mp-list" style="min-height:220px"></div>`;
+  }
+
+  function wireMasterPids() {
+    const ids = ['type', 'color', 'design', 'size'].map(k => `sf-mp-${k}`);
+    const preview = () => {
+      const parts = ids.map(id => el(id).value);
+      el('sf-mp-preview').textContent = parts.every(Boolean) ? `PID: ${parts.join('-')}` : 'Pick all four to build the PID';
+    };
+    ids.forEach(id => el(id).addEventListener('change', preview));
+    preview();
+
+    el('sf-mp-add').onclick = async () => {
+      const errEl = el('sf-mp-err'); errEl.textContent = '';
+      const [type, color, design, size] = ids.map(id => el(id).value);
+      if (!type || !color || !design || !size) { errEl.textContent = 'Pick all four attributes'; return; }
+      try {
+        await api('/products', {
+          method: 'POST',
+          body: JSON.stringify({
+            type, color, design, size,
+            unitCost: Number(el('sf-mp-cost').value) || 0,
+            sellingPrice: Number(el('sf-mp-price').value) || 0,
+            lowStockThreshold: Number(el('sf-mp-low').value) || 5,
+          }),
+        });
+        setSaved(); showToast(`✓ ${type}-${color}-${design}-${size} added`, 'success');
+        renderMaster('pids');
+      } catch (err) { errEl.textContent = err.message; }
+    };
+
+    const stockMap = Object.fromEntries(S.products.map(p => [p.pid, p.stock]));
+    const colDefs = [
+      { headerName: t('pid'), field: 'pid', cellClass: 'sf-cell-pid', flex: 2, minWidth: 240, cellRenderer: p => esc(p.value) + (p.data.isActive ? '' : ' 🚫') },
+      { headerName: `${t('unitCost')} ৳`, field: 'unitCost', width: 120, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, Number(p.newValue) || 0) },
+      { headerName: `${t('price')} ৳`, field: 'sellingPrice', width: 120, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, Number(p.newValue) || 0) },
+      { headerName: 'Alert ≤', field: 'lowStockThreshold', width: 100, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, parseInt(p.newValue, 10) || 0) },
+      { headerName: t('stockCol'), width: 100, type: 'rightAligned', valueGetter: p => stockMap[p.data.pid] ?? 0, cellClass: p => ((stockMap[p.data.pid] ?? 0) <= (p.data.lowStockThreshold ?? 5) ? 'sf-cell-low' : 'sf-cell-ok') },
+      {
+        headerName: '', width: 110, sortable: false, filter: false,
+        cellRenderer: p => p.data.isActive
+          ? `<button class="btn btn-danger btn-sm sf-void-btn" data-sf-mp-deact="${p.data.pid}">Deactivate</button>`
+          : `<button class="btn btn-outline btn-sm sf-void-btn" data-sf-mp-react="${p.data.pid}">Activate</button>`,
+      },
+    ];
+
+    gridOrCards(
+      el('sf-mp-list'),
+      {
+        columnDefs: colDefs,
+        rowData: [...S.products],
+        stopEditingWhenCellsLoseFocus: true,
+        onCellValueChanged: async (e) => {
+          try {
+            await api(`/products/${e.data.pid}`, { method: 'PUT', body: JSON.stringify({ [e.colDef.field]: e.data[e.colDef.field] }) });
+            setSaved();
+          } catch (err) { showToast(err.message, 'error'); renderMaster('pids'); }
+        },
+      },
+      () => S.products.map(p => `
+        <div class="sf-card">
+          <div class="sf-card-top">
+            <div class="sf-card-pid">${esc(p.pid)}${p.isActive ? '' : ' 🚫'}</div>
+            <span class="sf-stock-chip ${(stockMap[p.pid] ?? 0) <= (p.lowStockThreshold ?? 5) ? 'low' : 'ok'}">${stockMap[p.pid] ?? 0}</span>
+          </div>
+          <div class="sf-card-meta">Cost ${money(p.unitCost)} · Sell ${money(p.sellingPrice)}${p.isActive ? ` · <button class="btn btn-danger btn-sm sf-void-btn" data-sf-mp-deact="${p.pid}">Deactivate</button>` : ` · <button class="btn btn-outline btn-sm sf-void-btn" data-sf-mp-react="${p.pid}">Activate</button>`}</div>
+        </div>`).join('') || `<div class="empty-state"><div class="empty-text">${t('noData')}</div></div>`
+    );
+
+    document.querySelectorAll('[data-sf-mp-deact]').forEach(b => b.onclick = async () => {
+      if (!confirm(`Deactivate ${b.dataset.sfMpDeact}? History is kept; it just disappears from pickers.`)) return;
+      try { await api(`/products/${b.dataset.sfMpDeact}`, { method: 'DELETE' }); setSaved(); renderMaster('pids'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+    document.querySelectorAll('[data-sf-mp-react]').forEach(b => b.onclick = async () => {
+      try { await api(`/products/${b.dataset.sfMpReact}`, { method: 'PUT', body: JSON.stringify({ isActive: true }) }); setSaved(); renderMaster('pids'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+  }
+
+  // ── Tab 3: CSV import with preview & validation ──
+  function masterImportHtml() {
+    return `
+      <div class="card sf-card">
+        <div class="card-title">📥 Import from your sheet (CSV)</div>
+        <div class="sf-hint" style="margin-bottom:0.6rem">
+          Export your Google Sheet tabs as CSV. Three kinds are supported:
+          <b>Products</b> — columns <code>type,color,design,size,unitCost,sellingPrice,lowStockThreshold</code> ·
+          <b>Shipments</b> — <code>pid,qty,note</code> ·
+          <b>Master values</b> — <code>kind,value</code>.
+          Existing PIDs/kinds/values are skipped (no duplicates). Nothing is committed until you press Import below.
+        </div>
+        <input type="file" id="sf-imp-file" accept=".csv,text/csv" class="form-input" style="padding:0.5rem" />
+        <div class="sf-hint" style="margin:0.5rem 0 0.3rem">…or paste CSV rows (first row = headers):</div>
+        <textarea class="form-input" id="sf-imp-text" rows="6" style="font-family:monospace;font-size:0.75rem" placeholder="type,color,design,size,unitCost,sellingPrice\nTSHIRT,NAVY,ABC,M,250,450\nPOLO,WHITE,DZ,L,400,750"></textarea>
+        <button class="btn btn-outline btn-sm" style="margin-top:0.5rem" id="sf-imp-analyze">🔍 Analyze</button>
+      </div>
+      <div id="sf-imp-preview"></div>`;
+  }
+
+  function parseCsv(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+    if (!lines.length) return { headers: [], rows: [] };
+    const split = (line) => {
+      const out = []; let cur = ''; let q = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+        else if (ch === '"') q = true;
+        else if (ch === ',') { out.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      out.push(cur);
+      return out.map(s => s.trim());
+    };
+    const headers = split(lines[0]).map(h => h.toLowerCase().replace(/[^a-z]/g, ''));
+    const rows = lines.slice(1).map(l => { const cells = split(l); return Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ''])); });
+    return { headers, rows };
+  }
+
+  function detectImportKind(rows) {
+    if (!rows.length) return null;
+    const has = (k) => rows.every(r => k in r) && rows.some(r => r[k] !== '');
+    if (has('pid') && has('qty')) return 'shipments';
+    if (has('kind') && has('value')) return 'master';
+    if (has('type') && has('color') && has('design') && has('size')) return 'products';
+    return null;
+  }
+
+  async function analyzeImport() {
+    const prev = el('sf-imp-preview');
+    const file = el('sf-imp-file')?.files?.[0];
+    let text = el('sf-imp-text').value;
+    if (file) text = await file.text();
+    if (!text.trim()) { prev.innerHTML = '<div class="sf-field-err">Paste CSV rows or choose a file first</div>'; return; }
+
+    const { headers, rows } = parseCsv(text);
+    const kind = detectImportKind(rows);
+    if (!kind) {
+      prev.innerHTML = `<div class="sf-field-err">Could not detect the table kind. Expected headers like type,color,design,size… or pid,qty… or kind,value. Got: ${esc(headers.join(', ') || '(none)')}</div>`;
+      return;
+    }
+
+    await loadMasters();
+    await loadProducts().catch(() => { });
+    const existingPids = new Set(S.products.map(p => p.pid));
+    const existingVals = new Set((S._allMasters || []).map(m => `${m.kind}:${m.value}`));
+    const errors = [], valid = [], skipped = [];
+
+    rows.forEach((r, i) => {
+      const line = i + 2; // +1 header, +1 human numbering
+      if (kind === 'master') {
+        const k = (r.kind || '').toLowerCase().trim();
+        const v = (r.value || '').toUpperCase().trim();
+        if (!['type', 'color', 'design', 'size'].includes(k)) { errors.push(`Row ${line}: kind "${r.kind}" must be type/color/design/size`); return; }
+        if (!v) { errors.push(`Row ${line}: value empty`); return; }
+        if (existingVals.has(`${k}:${v}`)) { skipped.push(`Row ${line}: ${k} ${v} already exists`); return; }
+        valid.push({ body: { kind: k, value: v } });
+      } else if (kind === 'products') {
+        const parts = { type: (r.type || '').toUpperCase().trim(), color: (r.color || '').toUpperCase().trim(), design: (r.design || '').toUpperCase().trim(), size: (r.size || '').toUpperCase().trim() };
+        const pid = [parts.type, parts.color, parts.design, parts.size].join('-');
+        if (Object.values(parts).some(x => !x)) { errors.push(`Row ${line}: missing one of type/color/design/size`); return; }
+        for (const [k, v] of Object.entries(parts)) {
+          if (!S.masters[k].includes(v)) { errors.push(`Row ${line}: ${k} "${v}" not in master list (import master values first)`); }
+        }
+        if (existingPids.has(pid)) { skipped.push(`Row ${line}: ${pid} already exists`); return; }
+        if (errors.some(e => e.startsWith(`Row ${line}:`))) return;
+        valid.push({ body: { ...parts, unitCost: Number(r.unitcost) || 0, sellingPrice: Number(r.sellingprice) || 0, lowStockThreshold: Number(r.lowstockthreshold) || 5 } });
+      } else if (kind === 'shipments') {
+        const pid = (r.pid || '').toUpperCase().replace(/[\s_]+/g, '-').replace(/-+/g, '-').trim();
+        const qty = parseInt(r.qty, 10);
+        if (!S.products.some(p => p.pid === pid)) { errors.push(`Row ${line}: unknown PID ${pid || '(empty)'} (import products first)`); return; }
+        if (!Number.isInteger(qty) || qty < 1) { errors.push(`Row ${line}: qty must be a whole number ≥ 1`); return; }
+        valid.push({ body: { pid, qty, note: r.note || '' } });
+      }
+    });
+
+    S._importPlan = { kind, valid, errors, skipped };
+    prev.innerHTML = `
+      <div class="card sf-card">
+        <div class="card-title">Preview — ${kind} (${rows.length} rows)</div>
+        ${errors.length ? `<div class="sf-zero-note" style="margin-bottom:0.4rem">❌ ${errors.length} error(s):<br>${errors.slice(0, 8).map(esc).join('<br>')}${errors.length > 8 ? '<br>…' : ''}</div>` : ''}
+        ${skipped.length ? `<div class="sf-hint">⏭ ${skipped.length} will be skipped (already exist):<br>${skipped.slice(0, 5).map(esc).join('<br>')}${skipped.length > 5 ? '<br>…' : ''}</div>` : ''}
+        <div class="sf-hint" style="margin-top:0.3rem">✅ ${valid.length} row(s) ready to import${errors.length ? ` — the ${errors.length} error row(s) will be left out; fix them later in the tabs above` : ''}</div>
+        ${valid.length ? `<button class="btn btn-primary btn-block" id="sf-imp-commit" style="margin-top:0.6rem">✓ Import ${valid.length} ${kind}${errors.length ? ' (valid rows only)' : ''}</button>` : ''}
+      </div>`;
+
+    const btn = el('sf-imp-commit');
+    if (btn) btn.onclick = commitImport;
+  }
+
+  async function commitImport() {
+    const plan = S._importPlan;
+    if (!plan || !plan.valid.length) return;
+    const endpoints = { master: ['/master', 'POST'], products: ['/products', 'POST'], shipments: ['/shipments', 'POST'] };
+    const [path, method] = endpoints[plan.kind];
+    let ok = 0;
+    for (const item of plan.valid) {
+      try { await api(path, { method, body: JSON.stringify(item.body) }); ok++; }
+      catch (err) { showToast(`${err.message}`, 'error'); }
+    }
+    setSaved(`✓ ${ok} imported`);
+    showToast(`✓ ${ok}/${plan.valid.length} ${plan.kind} imported`, 'success');
+    S._importPlan = null;
+    renderMaster('import');
+  }
+
+  function wireMasterImport() {
+    el('sf-imp-analyze').onclick = analyzeImport;
+    el('sf-imp-file').addEventListener('change', () => { if (el('sf-imp-file').files[0]) analyzeImport(); });
+  }
+
   // ═══════════════ ROUTER ═══════════════
   const VIEWS = {
     hub: renderHub,
     stock: () => renderStock(false),
     shipment: renderShipment,
     sell: renderSell,
+    cost: renderCost,
+    revenue: renderRevenue,
+    team: renderTeam,
+    dashboard: renderDashboard,
+    master: () => renderMaster(),
   };
-  const COMING_SOON = {
-    cost: ['💸', 'Cost', 'Phase 3 — per-PID & overhead expenses'],
-    revenue: ['📈', 'Revenue', 'Phase 3 — revenue, cost & profit with date filters'],
-    team: ['👥', 'Team', 'Phase 3 — per-seller performance'],
-    master: ['🧩', 'Master', 'Phase 3 — manage Types, Colors, Designs, Sizes'],
-    dashboard: ['📊', 'Dashboard', 'Phase 3 — totals, top sellers & recent sales'],
-  };
+  const COMING_SOON = {};
   let currentSfView = 'hub';
 
   function open(view) {
@@ -779,6 +1430,17 @@
     if (decBtn) { bumpCartQty(decBtn.dataset.sfCartDec, -1); return; }
     const incBtn = e.target.closest('[data-sf-cart-inc]');
     if (incBtn) { bumpCartQty(incBtn.dataset.sfCartInc, 1); return; }
+    const voidExp = e.target.closest('[data-sf-void-exp]');
+    if (voidExp) { voidExpense(voidExp.dataset.sfVoidExp); return; }
+    const mtab = e.target.closest('[data-sf-mtab]');
+    if (mtab) { renderMaster(mtab.dataset.sfMtab); return; }
+    const rangeTab = e.target.closest('[data-sf-range]');
+    if (rangeTab) {
+      const st = currentSfView === 'cost' ? S._costState : currentSfView === 'revenue' ? S._revState : S._teamState;
+      st.preset = rangeTab.dataset.sfRange;
+      SF.refresh();
+      return;
+    }
   });
 
   document.addEventListener('change', (e) => {
