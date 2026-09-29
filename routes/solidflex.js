@@ -12,7 +12,9 @@ const reports = require('../controllers/solidflex/reportController');
 router.use(auth); // every SOLID FLEX route requires a valid PIN-issued JWT
 
 // ── Master lists (Type/Color/Design/Size) ──
-router.get('/master', can('sfManageMasters'), master.list);
+// Read: any SOLID FLEX user (sell screen needs the lists for PID autofill)
+// Write: managers and up
+router.get('/master', can('sfSell'), master.list);
 router.post('/master', can('sfManageMasters'), master.create);
 router.put('/master/:id', can('sfManageMasters'), master.update);
 router.put('/master/:id/deactivate', can('sfManageMasters'), master.deactivate);
