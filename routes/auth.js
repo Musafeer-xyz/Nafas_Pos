@@ -2,8 +2,14 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { rateLimit } = require('../middleware/rateLimiter');
 
-router.post('/login', async (req, res) => {
+// Brute-force protection on PIN entry (env-tunable, defaults: 5 tries / 10 min / IP)
+router.post('/login', rateLimit({
+  windowMs: (parseInt(process.env.SF_LOGIN_WINDOW_MINUTES) || 10) * 60 * 1000,
+  max: parseInt(process.env.SF_LOGIN_MAX_ATTEMPTS) || 5,
+  message: 'Too many PIN attempts — try again in a few minutes',
+}), async (req, res) => {
   const { pin } = req.body;
   if (!pin) return res.status(400).json({ message: 'PIN required' });
 

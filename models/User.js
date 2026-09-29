@@ -16,6 +16,13 @@ const userSchema = new mongoose.Schema({
         manageCosts: { type: Boolean, default: false },
         transferStock: { type: Boolean, default: false },
         deleteSales: { type: Boolean, default: false },
+        // ── SOLID FLEX module (additive) ──
+        sfSell: { type: Boolean, default: false },
+        sfManageShipments: { type: Boolean, default: false },
+        sfManageMasters: { type: Boolean, default: false },
+        sfManageExpenses: { type: Boolean, default: false },
+        sfViewProfit: { type: Boolean, default: false },
+        sfVoid: { type: Boolean, default: false },
     }
 }, { timestamps: true });
 
