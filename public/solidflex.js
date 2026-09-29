@@ -61,7 +61,11 @@
       },
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.message || `Request failed (${res.status})`);
+    if (!res.ok) {
+      const err = new Error(data.message || `Request failed (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
     return data;
   }
 
@@ -148,7 +152,7 @@
       { id: 'sell', icon: '🛒', perm: null },
       { id: 'stock', icon: '📦', perm: null },
       { id: 'shipment', icon: '🚚', perm: 'sfManageShipments' },
-      { id: 'cost', icon: '💸', perm: 'sfManageExpenses', adminOnly: true },
+      { id: 'cost', icon: '💸', adminOnly: true }, // expenses are Owner-only (server enforces too)
       { id: 'revenue', icon: '📈', perm: null },
       { id: 'team', icon: '👥', perm: null },
       { id: 'master', icon: '🧩', perm: 'sfManageMasters' },
@@ -361,6 +365,18 @@
       rows = S._shipments || [];
       cols = ['date', 'pid', 'qty', 'note', 'receivedBy', 'voided'];
       name = 'SF_Shipments';
+    } else if (kind === 'expenses') {
+      rows = S._expenses || [];
+      cols = ['date', 'scope', 'pid', 'category', 'amount', 'voided', 'note'];
+      name = 'SF_Expenses';
+    } else if (kind === 'team') {
+      rows = S._team || [];
+      cols = ['seller', 'unitsSold', 'totalSalesValue', 'cashCollected', 'salesCount'];
+      name = 'SF_Team';
+    } else if (kind === 'revenue') {
+      rows = S._revenue ? [S._revenue] : [];
+      cols = ['revenue', 'units', 'salesCount', 'cogs', 'overhead', 'perPidCost', 'cost', 'profit'];
+      name = 'SF_Revenue';
     } else return;
     const escCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [cols.join(','), ...rows.map(r => cols.map(c => escCsv(r[c])).join(','))].join('\n');
@@ -372,19 +388,301 @@
     URL.revokeObjectURL(a.href);
   }
 
+  // ═══════════════ shared date-range helper ═══════════════
+  function rangeParams(preset, custom = {}) {
+    const now = new Date();
+    const fmt = (d) => d.toISOString().split('T')[0];
+    if (preset === 'today') return { from: fmt(now), to: fmt(now) };
+    if (preset === 'week') { const s = new Date(now); s.setDate(now.getDate() - 6); return { from: fmt(s), to: fmt(now) }; }
+    if (preset === 'month') return { from: fmt(new Date(now.getFullYear(), now.getMonth(), 1)), to: fmt(now) };
+    if (preset === 'custom') return { from: custom.from || '', to: custom.to || '' };
+    return {}; // all
+  }
+
+  function rangeBarHtml(state) {
+    return `
+      <div class="period-tabs">
+        ${['today', 'week', 'month', 'all'].map(p => `<button class="period-tab ${state.preset === p ? 'active' : ''}" data-sf-range="${p}">${{ today: 'Today', week: '7 Days', month: 'This Month', all: 'All' }[p]}</button>`).join('')}
+      </div>`;
+  }
+
+  // ═══════════════ VIEW: COST (Owner only) ═══════════════
+  async function renderCost() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._costState) S._costState = { preset: 'month', from: '', to: '' };
+    const st = S._costState;
+
+    try {
+      await loadProducts().catch(() => { });
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const expenses = await api('/expenses?' + q.toString());
+      S._expenses = expenses;
+      const perPid = expenses.filter(e => e.scope === 'per_pid');
+      const overhead = expenses.filter(e => e.scope === 'overhead');
+      const sum = (l) => l.filter(e => !e.voided).reduce((s, e) => s + e.amount, 0);
+
+      const expRow = (e) => `
+        <div class="sf-card">
+          <div class="sf-card-top">
+            <div class="sf-card-pid">${esc(e.scope === 'per_pid' ? e.pid : e.category)}</div>
+            <div style="display:flex;align-items:center;gap:0.4rem">
+              <b style="color:var(--danger)">${money(e.amount)}</b>
+              ${e.voided ? '<span class="sf-stock-chip low">VOID</span>' : `<button class="btn btn-danger btn-sm sf-void-btn" data-sf-void-exp="${e._id}">✕</button>`}
+            </div>
+          </div>
+          <div class="sf-card-meta">${new Date(e.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${esc(e.category)}${e.note ? ' · ' + esc(e.note) : ''}</div>
+        </div>`;
+
+      const pidOptions = S.products.filter(p => p.isActive).map(p => `<option value="${esc(p.pid)}">${esc(p.pid)}</option>`).join('');
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div>
+            <div class="sf-title">💸 ${t('cost')} <span class="sf-badge">Owner</span></div>
+            <div class="sf-sub">Per-PID: ${money(sum(perPid))} · Overhead: ${money(sum(overhead))}</div>
+          </div>
+          <div class="sf-actions"><button class="btn btn-outline btn-sm" data-sf-export="expenses">⬇ CSV</button></div>
+        </div>
+        ${rangeBarHtml(st)}
+
+        <div class="card sf-card">
+          <div class="card-title">➕ Record Expense</div>
+          <div class="sf-cascade">
+            <div>
+              <label class="form-label">Type</label>
+              <select class="form-select" id="sf-cx-scope">
+                <option value="overhead">Overhead (ads, rent, shipping…)</option>
+                <option value="per_pid">Per-PID (cost tied to one product)</option>
+              </select>
+            </div>
+            <div id="sf-cx-pidbox" style="display:none">
+              <label class="form-label">${t('pid')}</label>
+              <select class="form-select" id="sf-cx-pid"><option value="">—</option>${pidOptions}</select>
+            </div>
+          </div>
+          <div class="sf-cascade" style="margin-top:0.5rem">
+            <div>
+              <label class="form-label">Amount ৳</label>
+              <input class="form-input" type="number" id="sf-cx-amount" min="1" placeholder="0" />
+            </div>
+            <div>
+              <label class="form-label">Category</label>
+              <select class="form-select" id="sf-cx-cat">
+                ${['Shipping', 'Ads', 'Rent', 'Utilities', 'Salary', 'Packaging', 'Photoshoot', 'Maintenance', 'Other'].map(c => `<option>${c}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:0.5rem">
+            <label class="form-label">${t('note')}</label>
+            <input class="form-input" id="sf-cx-note" placeholder="Optional" />
+          </div>
+          <div class="sf-field-err" id="sf-cx-err"></div>
+          <button class="btn btn-primary btn-block" id="sf-cx-save" style="margin-top:0.5rem">✓ ${t('save')}</button>
+        </div>
+
+        <div class="card sf-card"><div class="card-title">Per-PID costs (${perPid.length})</div>
+          ${perPid.length ? perPid.map(expRow).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+        <div class="card sf-card"><div class="card-title">Overhead (${overhead.length})</div>
+          ${overhead.length ? overhead.map(expRow).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+        <div class="sf-saved" id="sf-saved"></div>
+      </div>`;
+
+      el('sf-cx-scope').addEventListener('change', () => {
+        el('sf-cx-pidbox').style.display = el('sf-cx-scope').value === 'per_pid' ? '' : 'none';
+      });
+      el('sf-cx-save').onclick = saveExpense;
+    } catch (err) {
+      if (err.status === 403) {
+        wrap.innerHTML = `<div class="sf-wrap"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem">🔒</div><div style="margin-top:0.5rem">Expenses are Owner-only</div></div></div>`;
+      } else showToast(err.message, 'error');
+    }
+  }
+
+  async function saveExpense() {
+    const errEl = el('sf-cx-err');
+    errEl.textContent = '';
+    const scope = el('sf-cx-scope').value;
+    const amount = Number(el('sf-cx-amount').value);
+    const pid = scope === 'per_pid' ? el('sf-cx-pid').value : null;
+    if (!Number.isFinite(amount) || amount <= 0) { errEl.textContent = 'Amount must be greater than 0'; return; }
+    if (scope === 'per_pid' && !pid) { errEl.textContent = 'Pick a PID'; return; }
+    try {
+      await api('/expenses', { method: 'POST', body: JSON.stringify({ scope, pid, amount, category: el('sf-cx-cat').value, note: el('sf-cx-note').value }) });
+      setSaved();
+      showToast('✓ Expense saved', 'success');
+      renderCost();
+    } catch (err) { errEl.textContent = err.message; }
+  }
+
+  async function voidExpense(id) {
+    if (!confirm('Void this expense? It will no longer count in profit.')) return;
+    try {
+      await api(`/expenses/${id}/void`, { method: 'PATCH' });
+      showToast('Expense voided', 'success');
+      renderCost();
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  // ═══════════════ VIEW: REVENUE ═══════════════
+  async function renderRevenue() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._revState) S._revState = { preset: 'month', from: '', to: '' };
+    const st = S._revState;
+
+    try {
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const data = await api('/reports/revenue?' + q.toString());
+      const isOwner = role === 'admin' || !!userPerms?.sfViewProfit;
+
+      const stat = (label, val, cls = '') => `
+        <div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value ${cls}">${val}</div></div>`;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">📈 ${t('revenue')}</div>
+          <div class="sf-sub">${data.salesCount} sales · ${data.units} units</div></div>
+          ${isOwner ? '<button class="btn btn-outline btn-sm" data-sf-export="revenue">⬇ CSV</button>' : ''}
+        </div>
+        ${rangeBarHtml(st)}
+        <div class="stat-grid">
+          ${stat('Revenue', money(data.revenue))}
+          ${stat('Units', data.units)}
+          ${isOwner ? stat('Cost', money(data.cost), 'danger') : ''}
+          ${isOwner ? stat('Net Profit', money(data.profit), 'success') : ''}
+        </div>
+        ${isOwner && data.salesCount + (data.overhead || 0) + (data.perPidCost || 0) > 0 && data.cost !== undefined ? `
+          <div class="card sf-card"><div class="card-title">Where cost comes from</div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Product cost (COGS)</span><b>${money(data.cogs)}</b></div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Overhead</span><b>${money(data.overhead)}</b></div>
+            <div class="flex-between" style="padding:0.3rem 0"><span>Per-PID costs</span><b>${money(data.perPidCost)}</b></div>
+            <hr class="divider"/>
+            <div class="flex-between"><span class="font-bold">Profit = Revenue − Cost</span><b class="text-success">${money(data.profit)}</b></div>
+          </div>` : ''}
+        ${!isOwner ? `<div class="sf-hint" style="text-align:center">Cost & profit visible to Owner only</div>` : ''}
+      </div>`;
+      S._revenue = data;
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ═══════════════ VIEW: TEAM ═══════════════
+  async function renderTeam() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    if (!S._teamState) S._teamState = { preset: 'month', from: '', to: '' };
+    const st = S._teamState;
+
+    try {
+      const q = new URLSearchParams(rangeParams(st.preset, st));
+      const rows = await api('/reports/team?' + q.toString());
+      S._team = rows;
+      const isSellerOnly = role !== 'admin' && !userPerms?.sfViewProfit && !userPerms?.sfManageShipments;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">👥 ${t('team')}</div>
+          <div class="sf-sub">${isSellerOnly ? 'Your performance' : rows.length + ' sellers'}</div></div>
+          <div class="sf-actions"><button class="btn btn-outline btn-sm" data-sf-export="team">⬇ CSV</button></div>
+        </div>
+        ${rangeBarHtml(st)}
+        <div id="sf-team-body" style="min-height:200px"></div>
+      </div>`;
+
+      const colDefs = [
+        { headerName: t('seller'), field: 'seller', flex: 1.4, minWidth: 130, cellRenderer: p => esc(p.value) },
+        { headerName: 'Units', field: 'unitsSold', width: 100, type: 'rightAligned', sort: 'desc' },
+        { headerName: 'Sales Value', field: 'totalSalesValue', width: 140, type: 'rightAligned', valueFormatter: p => money(p.value) },
+        { headerName: 'Cash Collected', field: 'cashCollected', width: 150, type: 'rightAligned', valueFormatter: p => money(p.value) },
+        { headerName: '# Sales', field: 'salesCount', width: 100, type: 'rightAligned' },
+        { headerName: 'Last Sale', field: 'lastSaleAt', width: 130, valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—' },
+      ];
+
+      gridOrCards(
+        el('sf-team-body'),
+        { columnDefs: colDefs, rowData: rows },
+        () => rows.map(r => `
+          <div class="sf-card">
+            <div class="sf-card-top"><div class="sf-card-pid">${esc(r.seller)}</div>
+            <span class="sf-stock-chip ok">${r.unitsSold} units</span></div>
+            <div class="sf-card-meta">Sold ${money(r.totalSalesValue)} · ${r.salesCount} sales</div>
+          </div>`).join('') || `<div class="empty-state"><div class="empty-text">${t('noData')}</div></div>`
+      );
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  // ═══════════════ VIEW: DASHBOARD ═══════════════
+  async function renderDashboard() {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    try {
+      const d = await api('/reports/dashboard');
+      S._dash = d;
+      const isOwner = role === 'admin' || !!userPerms?.sfViewProfit;
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">📊 ${t('dashboard')}</div>
+          <div class="sf-sub">This month</div></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-label">Sales (month)</div><div class="stat-value">${d.salesThisMonth}</div></div>
+          <div class="stat-card"><div class="stat-label">Revenue (month)</div><div class="stat-value">${money(d.revenueThisMonth)}</div></div>
+          ${isOwner ? `<div class="stat-card"><div class="stat-label">Profit (month)</div><div class="stat-value success">${money(d.profitThisMonth)}</div></div>` : ''}
+          <div class="stat-card"><div class="stat-label">Units in Stock</div><div class="stat-value">${d.unitsInStock}</div></div>
+        </div>
+
+        ${d.lowStock.length ? `
+        <div class="alert-banner">⚠️ ${d.lowStock.length} PID(s) low on stock
+          ${d.lowStock.slice(0, 5).map(l => `<br>• ${esc(l.pid)}: ${l.stock} left`).join('')}
+          ${d.lowStock.length > 5 ? `<br>…and ${d.lowStock.length - 5} more` : ''}
+        </div>` : ''}
+
+        ${d.topProducts.length ? `
+        <div class="card sf-card"><div class="card-title">🏆 Top Products</div>
+          ${d.topProducts.map((p, i) => `
+            <div class="flex-between" style="padding:0.35rem 0">
+              <span style="font-size:0.85rem">${i + 1}. ${esc(p._id)}</span>
+              <span><b>${p.units}</b> units · <span class="text-gold">${money(p.revenue)}</span></span>
+            </div>`).join('')}
+        </div>` : ''}
+
+        <div class="card sf-card"><div class="card-title">${t('history')}</div>
+          ${d.recentSales.length ? d.recentSales.map(s => `
+            <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid var(--border)">
+              <div><b style="font-size:0.82rem">${esc(s.serial)}</b> <span class="sf-hint">${esc(s.pid)}</span></div>
+              <div style="text-align:right"><b>${money(s.price * s.qty)}</b><div class="sf-hint">${esc(s.seller)} · ${new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}${s.status !== 'active' ? ` · ${s.status.toUpperCase()}` : ''}</div></div>
+            </div>`).join('') : `<div class="sf-hint">${t('noData')}</div>`}
+        </div>
+      </div>`;
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
   // ═══════════════ ROUTER ═══════════════
   const VIEWS = {
     hub: renderHub,
     stock: () => renderStock(false),
     shipment: renderShipment,
     sell: renderSell,
+    cost: renderCost,
+    revenue: renderRevenue,
+    team: renderTeam,
+    dashboard: renderDashboard,
   };
   const COMING_SOON = {
-    cost: ['💸', 'Cost', 'Phase 3 — per-PID & overhead expenses'],
-    revenue: ['📈', 'Revenue', 'Phase 3 — revenue, cost & profit with date filters'],
-    team: ['👥', 'Team', 'Phase 3 — per-seller performance'],
-    master: ['🧩', 'Master', 'Phase 3 — manage Types, Colors, Designs, Sizes'],
-    dashboard: ['📊', 'Dashboard', 'Phase 3 — totals, top sellers & recent sales'],
+    master: ['🧩', 'Master', 'Coming next — manage Types, Colors, Designs, Sizes'],
   };
   let currentSfView = 'hub';
 
@@ -779,6 +1077,15 @@
     if (decBtn) { bumpCartQty(decBtn.dataset.sfCartDec, -1); return; }
     const incBtn = e.target.closest('[data-sf-cart-inc]');
     if (incBtn) { bumpCartQty(incBtn.dataset.sfCartInc, 1); return; }
+    const voidExp = e.target.closest('[data-sf-void-exp]');
+    if (voidExp) { voidExpense(voidExp.dataset.sfVoidExp); return; }
+    const rangeTab = e.target.closest('[data-sf-range]');
+    if (rangeTab) {
+      const st = currentSfView === 'cost' ? S._costState : currentSfView === 'revenue' ? S._revState : S._teamState;
+      st.preset = rangeTab.dataset.sfRange;
+      SF.refresh();
+      return;
+    }
   });
 
   document.addEventListener('change', (e) => {
