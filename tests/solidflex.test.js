@@ -132,6 +132,22 @@ describe('SOLID FLEX API', () => {
     assert.match(r.body.message, /color master list/);
   });
 
+  test('master value rename blocked while products reference it; unused renames fine', async () => {
+    const masters = await api(owner.token, 'GET', '/api/solidflex/master?kind=color');
+    const black = masters.body.find(m => m.value === 'BLACK');
+    const blocked = await api(owner.token, 'PUT', `/api/solidflex/master/${black._id}`, { value: 'JETBLACK' });
+    assert.equal(blocked.status, 409);
+    assert.match(blocked.body.message, /product\(s\) use it/);
+
+    // unused value can be renamed
+    await api(owner.token, 'POST', '/api/solidflex/master', { kind: 'size', value: 'XXL' });
+    const sizes = await api(owner.token, 'GET', '/api/solidflex/master?kind=size');
+    const xxl = sizes.body.find(m => m.value === 'XXL');
+    const ok = await api(owner.token, 'PUT', `/api/solidflex/master/${xxl._id}`, { value: 'XXL2' });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.value, 'XXL2');
+  });
+
   test('sale over stock is rejected; stock stays consistent', async () => {
     await api(owner.token, 'POST', '/api/solidflex/shipments', { pid: 'TSHIRT-BLACK-ABC-M', qty: 3 });
     const r = await api(owner.token, 'POST', '/api/solidflex/sales', { pid: 'TSHIRT-BLACK-ABC-M', qty: 2 });

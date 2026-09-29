@@ -191,7 +191,7 @@
   font-size: 16px; /* prevent iOS zoom */
 }
 
-.sf-sell-form .sf-cascade {
+.sf-cascade {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
@@ -282,7 +282,7 @@
     display: flex !important;
   }
 
-  .sf-sell-form .sf-cascade {
+  .sf-cascade {
     grid-template-columns: 1fr;
   }
 

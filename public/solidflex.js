@@ -94,6 +94,7 @@
   // ── Data loading ──
   async function loadMasters() {
     const items = await api('/master');
+    S._allMasters = items; // full list incl. inactive (Master screen)
     S.masters = { type: [], color: [], design: [], size: [] };
     for (const m of items) {
       if (m.isActive && S.masters[m.kind]) S.masters[m.kind].push(m.value);
@@ -670,6 +671,359 @@
     }
   }
 
+  // ═══════════════ VIEW: MASTER (Owner/Manager) ═══════════════
+  async function renderMaster(tab = S._masterTab || 'attrs') {
+    const wrap = el('main-content');
+    wrap.innerHTML = `<div class="sf-wrap"><div class="sf-loading"><div class="spinner"></div></div></div>`;
+    S._masterTab = tab;
+
+    try {
+      if (tab === 'attrs') await loadMasters();
+      else await Promise.all([loadMasters(), loadProducts()]);
+
+      const tabsHtml = `
+        <div class="period-tabs">
+          <button class="period-tab ${tab === 'attrs' ? 'active' : ''}" data-sf-mtab="attrs">Lists (Type/Color/Design/Size)</button>
+          <button class="period-tab ${tab === 'pids' ? 'active' : ''}" data-sf-mtab="pids">PID Products</button>
+          <button class="period-tab ${tab === 'import' ? 'active' : ''}" data-sf-mtab="import">📥 Import</button>
+        </div>`;
+
+      const bodyHtml = tab === 'attrs' ? masterAttrsHtml() : tab === 'pids' ? masterPidsHtml() : masterImportHtml();
+
+      wrap.innerHTML = `
+      <div class="sf-wrap">
+        <div class="sf-brandbar">
+          <div><div class="sf-title">🧩 ${t('master')}</div>
+          <div class="sf-sub">${tab === 'attrs' ? 'The four attribute lists — PIDs are built from these' : tab === 'pids' ? 'Every sellable variant' : 'Bring your existing sheet data in'}</div></div>
+        </div>
+        ${tabsHtml}
+        <div class="sf-saved" id="sf-saved"></div>
+        ${bodyHtml}
+      </div>`;
+
+      if (tab === 'attrs') wireMasterAttrs();
+      else if (tab === 'pids') wireMasterPids();
+      else wireMasterImport();
+    } catch (err) {
+      if (err.status === 403) {
+        wrap.innerHTML = `<div class="sf-wrap"><div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem">🔒</div><div style="margin-top:0.5rem">Master data is Manager/Owner-only</div></div></div>`;
+      } else showToast(err.message, 'error');
+    }
+  }
+
+  // ── Tab 1: attribute lists ──
+  function masterAttrsHtml() {
+    const kinds = ['type', 'color', 'design', 'size'];
+    return `
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap">
+        ${kinds.map(k => `<select class="form-select" id="sf-ma-new-${k}" style="flex:1;min-width:120px" placeholder="New ${k}"><option value="">+ new ${k}</option></select>`).join('')}
+        <input class="form-input" id="sf-ma-note" style="flex:1;min-width:140px" placeholder="Note (optional)" />
+        <button class="btn btn-primary btn-sm" id="sf-ma-add">Add</button>
+      </div>
+      <div class="sf-hint" style="margin-bottom:0.5rem">Type the new value into the box of its kind (e.g. "NAVY" under color), then Add. Values used by products cannot be renamed or deleted — only deactivated.</div>
+      ${kinds.map(k => `
+        <div class="card sf-card">
+          <div class="card-title">${k.toUpperCase()} <span style="font-weight:400;font-size:0.7rem;color:var(--text-muted)">(${S.masters[k].filter(v => true).length || 0})</span></div>
+          <div id="sf-ma-list-${k}">
+            ${(S._allMasters || []).filter(m => m.kind === k).map(m => `
+              <div class="flex-between" style="padding:0.4rem 0;border-bottom:1px solid var(--border)">
+                <div>
+                  <b style="font-size:0.85rem;${m.isActive ? '' : 'color:var(--text-muted);text-decoration:line-through'}">${esc(m.value)}</b>
+                  ${m.note ? `<span class="sf-hint"> · ${esc(m.note)}</span>` : ''}
+                  ${!m.isActive ? '<span class="sf-stock-chip low" style="margin-left:0.3rem">inactive</span>' : ''}
+                </div>
+                <div style="display:flex;gap:0.3rem">
+                  ${m.isActive
+                    ? `<button class="btn btn-outline btn-sm" data-sf-ma-edit="${m._id}">Rename</button>
+                       <button class="btn btn-danger btn-sm" data-sf-ma-deact="${m._id}">Deactivate</button>`
+                    : `<button class="btn btn-outline btn-sm" data-sf-ma-react="${m._id}">Reactivate</button>`}
+                </div>
+              </div>`).join('') || `<div class="sf-hint">${t('noData')}</div>`}
+          </div>
+        </div>`).join('')}`;
+  }
+
+  function wireMasterAttrs() {
+    // populate the 4 "new value" inputs as free-text datalist combos
+    ['type', 'color', 'design', 'size'].forEach(k => {
+      const sel = el(`sf-ma-new-${k}`);
+      if (!sel) return;
+      // allow free text: replace select with input+datalist behavior
+      const wrapIn = document.createElement('div');
+      wrapIn.innerHTML = `<input class="form-input" list="sf-ma-dl-${k}" id="sf-ma-new-${k}" placeholder="new ${k}" style="width:100%" />
+        <datalist id="sf-ma-dl-${k}">${S.masters[k].map(v => `<option value="${esc(v)}"></option>`).join('')}</datalist>`;
+      sel.replaceWith(wrapIn.firstChild);
+    });
+
+    el('sf-ma-add').onclick = async () => {
+      const kinds = ['type', 'color', 'design', 'size'];
+      const entries = kinds.map(k => ({ k, v: el(`sf-ma-new-${k}`).value.trim() })).filter(x => x.v);
+      if (!entries.length) return showToast('Type a value in a box first', 'error');
+      let okCount = 0;
+      for (const { k, v } of entries) {
+        try {
+          const r = await api('/master', { method: 'POST', body: JSON.stringify({ kind: k, value: v, note: el('sf-ma-note')?.value || '' }) });
+          if (r.reactivated) showToast(`${v} reactivated`, 'success'); else okCount++;
+        } catch (err) { showToast(`${k}/${v}: ${err.message}`, 'error'); }
+      }
+      if (okCount) { setSaved(`✓ ${okCount} added`); showToast(`✓ ${okCount} value(s) added`, 'success'); }
+      renderMaster('attrs');
+    };
+
+    document.querySelectorAll('[data-sf-ma-edit]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.sfMaEdit;
+      const cur = (S._allMasters || []).find(m => m._id === id);
+      const v = prompt('Rename value (only allowed while no product uses it):', cur?.value || '');
+      if (!v || v === cur?.value) return;
+      try { await api(`/master/${id}`, { method: 'PUT', body: JSON.stringify({ value: v }) }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+
+    document.querySelectorAll('[data-sf-ma-deact]').forEach(b => b.onclick = async () => {
+      if (!confirm('Deactivate this value? It stays in history but disappears from the pickers.')) return;
+      try { await api(`/master/${b.dataset.sfMaDeact}/deactivate`, { method: 'PUT' }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+
+    document.querySelectorAll('[data-sf-ma-react]').forEach(b => b.onclick = async () => {
+      try { await api(`/master/${b.dataset.sfMaReact}`, { method: 'PUT', body: JSON.stringify({ isActive: true }) }); setSaved(); renderMaster('attrs'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+  }
+
+  // ── Tab 2: PID products ──
+  function masterPidsHtml() {
+    const rows = S.products;
+    return `
+      <div class="card sf-card">
+        <div class="card-title">➕ New Product (auto-builds PID)</div>
+        <div class="sf-cascade">
+          <div><label class="form-label">${t('type')}</label><select class="form-select" id="sf-mp-type"><option value="">—</option>${S.masters.type.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('color')}</label><select class="form-select" id="sf-mp-color"><option value="">—</option>${S.masters.color.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('design')}</label><select class="form-select" id="sf-mp-design"><option value="">—</option>${S.masters.design.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+          <div><label class="form-label">${t('size')}</label><select class="form-select" id="sf-mp-size"><option value="">—</option>${S.masters.size.map(v => `<option>${esc(v)}</option>`).join('')}</select></div>
+        </div>
+        <div class="sf-cascade" style="margin-top:0.5rem">
+          <div><label class="form-label">${t('unitCost')} ৳</label><input class="form-input" type="number" id="sf-mp-cost" min="0" placeholder="0" /></div>
+          <div><label class="form-label">${t('price')} ৳</label><input class="form-input" type="number" id="sf-mp-price" min="0" placeholder="0" /></div>
+          <div><label class="form-label">Alert ≤</label><input class="form-input" type="number" id="sf-mp-low" min="0" placeholder="5" /></div>
+        </div>
+        <div class="sf-hint" id="sf-mp-preview" style="margin-top:0.4rem"></div>
+        <div class="sf-field-err" id="sf-mp-err"></div>
+        <button class="btn btn-primary btn-block" id="sf-mp-add" style="margin-top:0.5rem">✓ Add Product</button>
+      </div>
+      <div id="sf-mp-list" style="min-height:220px"></div>`;
+  }
+
+  function wireMasterPids() {
+    const ids = ['type', 'color', 'design', 'size'].map(k => `sf-mp-${k}`);
+    const preview = () => {
+      const parts = ids.map(id => el(id).value);
+      el('sf-mp-preview').textContent = parts.every(Boolean) ? `PID: ${parts.join('-')}` : 'Pick all four to build the PID';
+    };
+    ids.forEach(id => el(id).addEventListener('change', preview));
+    preview();
+
+    el('sf-mp-add').onclick = async () => {
+      const errEl = el('sf-mp-err'); errEl.textContent = '';
+      const [type, color, design, size] = ids.map(id => el(id).value);
+      if (!type || !color || !design || !size) { errEl.textContent = 'Pick all four attributes'; return; }
+      try {
+        await api('/products', {
+          method: 'POST',
+          body: JSON.stringify({
+            type, color, design, size,
+            unitCost: Number(el('sf-mp-cost').value) || 0,
+            sellingPrice: Number(el('sf-mp-price').value) || 0,
+            lowStockThreshold: Number(el('sf-mp-low').value) || 5,
+          }),
+        });
+        setSaved(); showToast(`✓ ${type}-${color}-${design}-${size} added`, 'success');
+        renderMaster('pids');
+      } catch (err) { errEl.textContent = err.message; }
+    };
+
+    const stockMap = Object.fromEntries(S.products.map(p => [p.pid, p.stock]));
+    const colDefs = [
+      { headerName: t('pid'), field: 'pid', cellClass: 'sf-cell-pid', flex: 2, minWidth: 240, cellRenderer: p => esc(p.value) + (p.data.isActive ? '' : ' 🚫') },
+      { headerName: `${t('unitCost')} ৳`, field: 'unitCost', width: 120, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, Number(p.newValue) || 0) },
+      { headerName: `${t('price')} ৳`, field: 'sellingPrice', width: 120, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, Number(p.newValue) || 0) },
+      { headerName: 'Alert ≤', field: 'lowStockThreshold', width: 100, editable: true, type: 'rightAligned', valueParser: p => Math.max(0, parseInt(p.newValue, 10) || 0) },
+      { headerName: t('stockCol'), width: 100, type: 'rightAligned', valueGetter: p => stockMap[p.data.pid] ?? 0, cellClass: p => ((stockMap[p.data.pid] ?? 0) <= (p.data.lowStockThreshold ?? 5) ? 'sf-cell-low' : 'sf-cell-ok') },
+      {
+        headerName: '', width: 110, sortable: false, filter: false,
+        cellRenderer: p => p.data.isActive
+          ? `<button class="btn btn-danger btn-sm sf-void-btn" data-sf-mp-deact="${p.data.pid}">Deactivate</button>`
+          : `<button class="btn btn-outline btn-sm sf-void-btn" data-sf-mp-react="${p.data.pid}">Activate</button>`,
+      },
+    ];
+
+    gridOrCards(
+      el('sf-mp-list'),
+      {
+        columnDefs: colDefs,
+        rowData: [...S.products],
+        stopEditingWhenCellsLoseFocus: true,
+        onCellValueChanged: async (e) => {
+          try {
+            await api(`/products/${e.data.pid}`, { method: 'PUT', body: JSON.stringify({ [e.colDef.field]: e.data[e.colDef.field] }) });
+            setSaved();
+          } catch (err) { showToast(err.message, 'error'); renderMaster('pids'); }
+        },
+      },
+      () => S.products.map(p => `
+        <div class="sf-card">
+          <div class="sf-card-top">
+            <div class="sf-card-pid">${esc(p.pid)}${p.isActive ? '' : ' 🚫'}</div>
+            <span class="sf-stock-chip ${(stockMap[p.pid] ?? 0) <= (p.lowStockThreshold ?? 5) ? 'low' : 'ok'}">${stockMap[p.pid] ?? 0}</span>
+          </div>
+          <div class="sf-card-meta">Cost ${money(p.unitCost)} · Sell ${money(p.sellingPrice)}${p.isActive ? ` · <button class="btn btn-danger btn-sm sf-void-btn" data-sf-mp-deact="${p.pid}">Deactivate</button>` : ` · <button class="btn btn-outline btn-sm sf-void-btn" data-sf-mp-react="${p.pid}">Activate</button>`}</div>
+        </div>`).join('') || `<div class="empty-state"><div class="empty-text">${t('noData')}</div></div>`
+    );
+
+    document.querySelectorAll('[data-sf-mp-deact]').forEach(b => b.onclick = async () => {
+      if (!confirm(`Deactivate ${b.dataset.sfMpDeact}? History is kept; it just disappears from pickers.`)) return;
+      try { await api(`/products/${b.dataset.sfMpDeact}`, { method: 'DELETE' }); setSaved(); renderMaster('pids'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+    document.querySelectorAll('[data-sf-mp-react]').forEach(b => b.onclick = async () => {
+      try { await api(`/products/${b.dataset.sfMpReact}`, { method: 'PUT', body: JSON.stringify({ isActive: true }) }); setSaved(); renderMaster('pids'); }
+      catch (err) { showToast(err.message, 'error'); }
+    });
+  }
+
+  // ── Tab 3: CSV import with preview & validation ──
+  function masterImportHtml() {
+    return `
+      <div class="card sf-card">
+        <div class="card-title">📥 Import from your sheet (CSV)</div>
+        <div class="sf-hint" style="margin-bottom:0.6rem">
+          Export your Google Sheet tabs as CSV. Three kinds are supported:
+          <b>Products</b> — columns <code>type,color,design,size,unitCost,sellingPrice,lowStockThreshold</code> ·
+          <b>Shipments</b> — <code>pid,qty,note</code> ·
+          <b>Master values</b> — <code>kind,value</code>.
+          Existing PIDs/kinds/values are skipped (no duplicates). Nothing is committed until you press Import below.
+        </div>
+        <input type="file" id="sf-imp-file" accept=".csv,text/csv" class="form-input" style="padding:0.5rem" />
+        <div class="sf-hint" style="margin:0.5rem 0 0.3rem">…or paste CSV rows (first row = headers):</div>
+        <textarea class="form-input" id="sf-imp-text" rows="6" style="font-family:monospace;font-size:0.75rem" placeholder="type,color,design,size,unitCost,sellingPrice\nTSHIRT,NAVY,ABC,M,250,450\nPOLO,WHITE,DZ,L,400,750"></textarea>
+        <button class="btn btn-outline btn-sm" style="margin-top:0.5rem" id="sf-imp-analyze">🔍 Analyze</button>
+      </div>
+      <div id="sf-imp-preview"></div>`;
+  }
+
+  function parseCsv(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+    if (!lines.length) return { headers: [], rows: [] };
+    const split = (line) => {
+      const out = []; let cur = ''; let q = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+        else if (ch === '"') q = true;
+        else if (ch === ',') { out.push(cur); cur = ''; }
+        else cur += ch;
+      }
+      out.push(cur);
+      return out.map(s => s.trim());
+    };
+    const headers = split(lines[0]).map(h => h.toLowerCase().replace(/[^a-z]/g, ''));
+    const rows = lines.slice(1).map(l => { const cells = split(l); return Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? ''])); });
+    return { headers, rows };
+  }
+
+  function detectImportKind(rows) {
+    if (!rows.length) return null;
+    const has = (k) => rows.every(r => k in r) && rows.some(r => r[k] !== '');
+    if (has('pid') && has('qty')) return 'shipments';
+    if (has('kind') && has('value')) return 'master';
+    if (has('type') && has('color') && has('design') && has('size')) return 'products';
+    return null;
+  }
+
+  async function analyzeImport() {
+    const prev = el('sf-imp-preview');
+    const file = el('sf-imp-file')?.files?.[0];
+    let text = el('sf-imp-text').value;
+    if (file) text = await file.text();
+    if (!text.trim()) { prev.innerHTML = '<div class="sf-field-err">Paste CSV rows or choose a file first</div>'; return; }
+
+    const { headers, rows } = parseCsv(text);
+    const kind = detectImportKind(rows);
+    if (!kind) {
+      prev.innerHTML = `<div class="sf-field-err">Could not detect the table kind. Expected headers like type,color,design,size… or pid,qty… or kind,value. Got: ${esc(headers.join(', ') || '(none)')}</div>`;
+      return;
+    }
+
+    await loadMasters();
+    await loadProducts().catch(() => { });
+    const existingPids = new Set(S.products.map(p => p.pid));
+    const existingVals = new Set((S._allMasters || []).map(m => `${m.kind}:${m.value}`));
+    const errors = [], valid = [], skipped = [];
+
+    rows.forEach((r, i) => {
+      const line = i + 2; // +1 header, +1 human numbering
+      if (kind === 'master') {
+        const k = (r.kind || '').toLowerCase().trim();
+        const v = (r.value || '').toUpperCase().trim();
+        if (!['type', 'color', 'design', 'size'].includes(k)) { errors.push(`Row ${line}: kind "${r.kind}" must be type/color/design/size`); return; }
+        if (!v) { errors.push(`Row ${line}: value empty`); return; }
+        if (existingVals.has(`${k}:${v}`)) { skipped.push(`Row ${line}: ${k} ${v} already exists`); return; }
+        valid.push({ body: { kind: k, value: v } });
+      } else if (kind === 'products') {
+        const parts = { type: (r.type || '').toUpperCase().trim(), color: (r.color || '').toUpperCase().trim(), design: (r.design || '').toUpperCase().trim(), size: (r.size || '').toUpperCase().trim() };
+        const pid = [parts.type, parts.color, parts.design, parts.size].join('-');
+        if (Object.values(parts).some(x => !x)) { errors.push(`Row ${line}: missing one of type/color/design/size`); return; }
+        for (const [k, v] of Object.entries(parts)) {
+          if (!S.masters[k].includes(v)) { errors.push(`Row ${line}: ${k} "${v}" not in master list (import master values first)`); }
+        }
+        if (existingPids.has(pid)) { skipped.push(`Row ${line}: ${pid} already exists`); return; }
+        if (errors.some(e => e.startsWith(`Row ${line}:`))) return;
+        valid.push({ body: { ...parts, unitCost: Number(r.unitcost) || 0, sellingPrice: Number(r.sellingprice) || 0, lowStockThreshold: Number(r.lowstockthreshold) || 5 } });
+      } else if (kind === 'shipments') {
+        const pid = (r.pid || '').toUpperCase().replace(/[\s_]+/g, '-').replace(/-+/g, '-').trim();
+        const qty = parseInt(r.qty, 10);
+        if (!S.products.some(p => p.pid === pid)) { errors.push(`Row ${line}: unknown PID ${pid || '(empty)'} (import products first)`); return; }
+        if (!Number.isInteger(qty) || qty < 1) { errors.push(`Row ${line}: qty must be a whole number ≥ 1`); return; }
+        valid.push({ body: { pid, qty, note: r.note || '' } });
+      }
+    });
+
+    S._importPlan = { kind, valid, errors, skipped };
+    prev.innerHTML = `
+      <div class="card sf-card">
+        <div class="card-title">Preview — ${kind} (${rows.length} rows)</div>
+        ${errors.length ? `<div class="sf-zero-note" style="margin-bottom:0.4rem">❌ ${errors.length} error(s):<br>${errors.slice(0, 8).map(esc).join('<br>')}${errors.length > 8 ? '<br>…' : ''}</div>` : ''}
+        ${skipped.length ? `<div class="sf-hint">⏭ ${skipped.length} will be skipped (already exist):<br>${skipped.slice(0, 5).map(esc).join('<br>')}${skipped.length > 5 ? '<br>…' : ''}</div>` : ''}
+        <div class="sf-hint" style="margin-top:0.3rem">✅ ${valid.length} row(s) ready to import${errors.length ? ` — the ${errors.length} error row(s) will be left out; fix them later in the tabs above` : ''}</div>
+        ${valid.length ? `<button class="btn btn-primary btn-block" id="sf-imp-commit" style="margin-top:0.6rem">✓ Import ${valid.length} ${kind}${errors.length ? ' (valid rows only)' : ''}</button>` : ''}
+      </div>`;
+
+    const btn = el('sf-imp-commit');
+    if (btn) btn.onclick = commitImport;
+  }
+
+  async function commitImport() {
+    const plan = S._importPlan;
+    if (!plan || !plan.valid.length) return;
+    const endpoints = { master: ['/master', 'POST'], products: ['/products', 'POST'], shipments: ['/shipments', 'POST'] };
+    const [path, method] = endpoints[plan.kind];
+    let ok = 0;
+    for (const item of plan.valid) {
+      try { await api(path, { method, body: JSON.stringify(item.body) }); ok++; }
+      catch (err) { showToast(`${err.message}`, 'error'); }
+    }
+    setSaved(`✓ ${ok} imported`);
+    showToast(`✓ ${ok}/${plan.valid.length} ${plan.kind} imported`, 'success');
+    S._importPlan = null;
+    renderMaster('import');
+  }
+
+  function wireMasterImport() {
+    el('sf-imp-analyze').onclick = analyzeImport;
+    el('sf-imp-file').addEventListener('change', () => { if (el('sf-imp-file').files[0]) analyzeImport(); });
+  }
+
   // ═══════════════ ROUTER ═══════════════
   const VIEWS = {
     hub: renderHub,
@@ -680,10 +1034,9 @@
     revenue: renderRevenue,
     team: renderTeam,
     dashboard: renderDashboard,
+    master: () => renderMaster(),
   };
-  const COMING_SOON = {
-    master: ['🧩', 'Master', 'Coming next — manage Types, Colors, Designs, Sizes'],
-  };
+  const COMING_SOON = {};
   let currentSfView = 'hub';
 
   function open(view) {
@@ -1079,6 +1432,8 @@
     if (incBtn) { bumpCartQty(incBtn.dataset.sfCartInc, 1); return; }
     const voidExp = e.target.closest('[data-sf-void-exp]');
     if (voidExp) { voidExpense(voidExp.dataset.sfVoidExp); return; }
+    const mtab = e.target.closest('[data-sf-mtab]');
+    if (mtab) { renderMaster(mtab.dataset.sfMtab); return; }
     const rangeTab = e.target.closest('[data-sf-range]');
     if (rangeTab) {
       const st = currentSfView === 'cost' ? S._costState : currentSfView === 'revenue' ? S._revState : S._teamState;
