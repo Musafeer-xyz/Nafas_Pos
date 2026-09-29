@@ -1,0 +1,299 @@
+/* ═══════════════════════════════════════════════════════════
+   SOLID FLEX module styles — all namespaced under .sf-
+   (loaded after index.html styles; cannot affect NAFAS screens)
+   ═══════════════════════════════════════════════════════════ */
+
+.sf-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sf-brandbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sf-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sf-title .sf-badge {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #fff;
+}
+
+.sf-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.sf-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+/* Hub cards */
+.sf-hub {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+}
+
+.sf-hub-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 0.8rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+  text-align: left;
+}
+
+.sf-hub-card:active {
+  transform: scale(0.98);
+}
+
+.sf-hub-card .sf-hub-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.sf-hub-card .sf-hub-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-top: 0.45rem;
+  color: var(--text);
+}
+
+.sf-hub-card .sf-hub-desc {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+/* AG Grid theming to match the app */
+.sf-grid .ag-theme-alpine {
+  --ag-font-family: 'DM Sans', sans-serif;
+  --ag-font-size: 13px;
+  --ag-border-color: var(--border);
+  --ag-background-color: var(--card);
+  --ag-odd-row-background-color: var(--dark-3);
+  --ag-header-background-color: var(--dark-4);
+  --ag-header-foreground-color: var(--text);
+  --ag-row-hover-color: var(--gold-dim);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.sf-grid .ag-theme-alpine .ag-header-cell-text {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sf-cell-low {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.sf-cell-ok {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.sf-cell-pid {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sf-inline-err {
+  background: rgba(255, 59, 48, 0.08);
+}
+
+/* Mobile card view (grid alternative) */
+.sf-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sf-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+}
+
+.sf-card .sf-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.sf-card .sf-card-pid {
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.sf-stock-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.sf-stock-chip.low {
+  background: rgba(255, 59, 48, 0.12);
+  color: var(--danger);
+}
+
+.sf-stock-chip.ok {
+  background: rgba(52, 199, 89, 0.12);
+  color: var(--success);
+}
+
+.sf-stock-chip.zero {
+  background: rgba(255, 59, 48, 0.18);
+  color: var(--danger);
+}
+
+.sf-card .sf-card-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Sell form (mobile) */
+.sf-sell-form .form-input,
+.sf-sell-form .form-select {
+  font-size: 16px; /* prevent iOS zoom */
+}
+
+.sf-sell-form .sf-cascade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.sf-sell-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--gold-dim);
+  border: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
+
+.sf-sell-total .sf-amount {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+}
+
+.sf-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.sf-saved {
+  font-size: 0.7rem;
+  color: var(--success);
+  min-height: 1em;
+}
+
+.sf-field-err {
+  color: var(--danger);
+  font-size: 0.72rem;
+  min-height: 1em;
+  margin-top: 0.15rem;
+}
+
+.sf-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sf-qty-row .qty-btn {
+  min-width: 42px;
+  min-height: 42px;
+}
+
+.sf-qty-row input {
+  width: 74px;
+  text-align: center;
+}
+
+.sf-zero-note {
+  font-size: 0.72rem;
+  color: var(--danger);
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid rgba(255, 59, 48, 0.25);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.sf-void-btn {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 0.55rem;
+}
+
+.sf-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Small screens: cards replace grids; forms full width */
+@media (max-width: 640px) {
+  .sf-grid {
+    display: none !important;
+  }
+
+  .sf-cards {
+    display: flex !important;
+  }
+
+  .sf-sell-form .sf-cascade {
+    grid-template-columns: 1fr;
+  }
+
+  .sf-hub {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop: hide card lists, show grids */
+@media (min-width: 641px) {
+  .sf-cards {
+    display: none !important;
+  }
+}
