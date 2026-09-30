@@ -1,10 +1,11 @@
 const Product = require('../models/Product');
 
-// GET all products
+// GET all products — Attar-only app: legacy Apparel/Gadget stay in the DB
+// but are hidden from every screen
 exports.getAll = async (req, res) => {
   try {
     const { category, lowStock } = req.query;
-    let filter = { isActive: true };
+    let filter = { isActive: true, category: category || 'Attar' };
     if (category) filter.category = category;
     if (lowStock === 'true') filter.$expr = { $lte: ['$stock', '$lowStockAlert'] };
 

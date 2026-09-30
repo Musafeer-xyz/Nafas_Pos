@@ -6,7 +6,7 @@ A lightweight Inventory & Point-of-Sale system for the NAFAS brand — built for
 
 - 🔐 **PIN login** — one admin PIN from `.env`, plus per-user accounts with fine-grained permissions
 - 🛒 **Fast sale entry** — cart with ml/piece units, custom price overrides, per-sale extra costs, live net-profit preview, and a review step before saving
-- 📦 **Stock by store** — main warehouse + branches, stock transfers, branch sales, low-stock alerts
+- 📦 **Single-store stock** — one warehouse view with low-stock alerts (legacy branch data preserved in DB)
 - 🎁 **Combo packs** — sell bundles that auto-deduct stock from every product inside
 - 🧾 **Costs tracker** — operational costs with Paid/Due/Partial status
 - 📥 **Bulk import** — paste products, past sales, and costs as plain text
@@ -48,7 +48,7 @@ npm run dev        # development (auto-restart with nodemon)
 
 ## Roles & Permissions
 
-The admin PIN has full access. Additional users are created in the **Users** tab, each with their own 4-digit PIN and any combination of: view dashboard, view stock, view history, sell from main store, sell from branch, add/edit products, manage costs, transfer stock, and delete sales. Quick presets make setup one tap.
+The admin PIN has full access. Additional users are created in the **USERS** tab, each with their own 4-digit PIN and any combination of: view dashboard, view stock, view history, record sales, add/edit products, manage costs, and delete sales. Quick presets make setup one tap. The app has three primary tabs — **NAFAS** (fragrance POS), **SOLID FLEX** (clothing line), and **USERS** (admin only).
 
 ## Project Structure
 
