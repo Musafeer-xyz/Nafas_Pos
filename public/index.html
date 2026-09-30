@@ -1285,45 +1285,7 @@
       touch-action: manipulation;
     }
 
-    /* NAFAS sub-tab pills (second navigation level inside the NAFAS tab) */
-    .sub-nav {
-      display: none; /* hidden on login screen; shown with the app */
-      gap: 0.4rem;
-      overflow-x: auto;
-      padding: 0.55rem 1rem 0.45rem;
-      background: var(--dark-2);
-      border-bottom: 1px solid var(--border);
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .sub-nav::-webkit-scrollbar {
-      display: none;
-    }
-
-    .sub-pill {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.85rem;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: var(--dark-3);
-      color: var(--text-muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .sub-pill.active {
-      background: var(--gold-dim);
-      border-color: var(--gold);
-      color: var(--gold);
-    }
+    /* NAFAS reuses SOLID FLEX's .sf-hub / .sf-hub-card styles (solidflex.css) */
 
     @supports (padding: max(0px)) {
       .bottom-nav {
@@ -1381,10 +1343,6 @@
         <div class="topbar-role" id="topbar-role">—</div>
       </div>
       <button class="icon-btn" onclick="logout()" title="Logout">⏏</button>
-    </div>
-
-    <div class="sub-nav" id="sub-nav">
-      <!-- NAFAS sub-tab pills, injected by buildSubNav -->
     </div>
 
     <div class="content" id="main-content">
@@ -1959,8 +1917,7 @@
       // Restore a half-built sale from before a refresh
       const restoredCart = restoreCartBranch();
       buildNav();
-      buildSubNav();
-      navigateTo(can('viewDashboard') ? 'dashboard' : (can('sellMain') ? 'sale' : 'stock'));
+      navigateTo('nafas');
       if (restoredCart) {
         navigateTo('sale');
         showToast('🛒 Restored your unfinished sale', 'success');
@@ -1983,56 +1940,71 @@
   `).join('');
     }
 
-    // ── NAFAS sub-tabs (pills): permission-filtered, mirroring the old nav ──
-    function buildSubNav() {
-      const sub = document.getElementById('sub-nav');
-      const items = [];
-      if (can('viewDashboard')) items.push({ id: 'dashboard', icon: 'dashboard', label: 'Dashboard' });
-      if (can('sellMain')) items.push({ id: 'sale', icon: 'sale', label: 'Sale' });
-      if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: 'products', label: 'Products' });
-      if (can('viewHistory')) items.push({ id: 'history', icon: 'history', label: 'History' });
-      if (can('manageCosts')) items.push({ id: 'costs', icon: 'costs', label: 'Costs' });
-      if (items.length === 0) items.push({ id: 'stock', icon: 'stock', label: 'Stock' });
-      sub.innerHTML = items.map(item => `
-    <button class="sub-pill" id="subpill-${item.id}" onclick="navigateTo('${item.id}')">
-      <span class="nav-icon">${ICONS[item.icon]}</span>${item.label}
-    </button>
-  `).join('');
-      sub.style.display = 'flex';
+    // ── NAFAS hub — mirrors the SOLID FLEX card hub (reuses .sf-hub styles) ──
+    function renderNafasHub() {
+      const cards = [
+        { id: 'dashboard', icon: '📊', label: 'Dashboard', desc: 'Revenue overview', gate: () => can('viewDashboard') },
+        { id: 'sale', icon: '🛒', label: 'Sale', desc: 'New sale entry', gate: () => can('sellMain') },
+        { id: 'products', icon: '📦', label: 'Products', desc: 'Stock & pricing', gate: () => can('viewStock') || can('addProducts') },
+        { id: 'history', icon: '🧾', label: 'History', desc: 'Past sales & exports', gate: () => can('viewHistory') },
+        { id: 'costs', icon: '💸', label: 'Costs', desc: 'Operational costs', gate: () => can('manageCosts') },
+        { id: 'bottles', icon: '🍶', label: 'Bottles', desc: 'Empty bottle stock', gate: () => can('viewStock') || can('addProducts') },
+      ].filter(c => c.gate());
+
+      document.getElementById('main-content').innerHTML = `
+        <div class="sf-wrap">
+          <div class="sf-brandbar">
+            <div>
+              <div class="sf-title">NAFAS <span class="sf-badge">NF</span></div>
+              <div class="sf-sub">Fragrance & Attar POS</div>
+            </div>
+          </div>
+          <div class="sf-hub">
+            ${cards.map(c => `
+              <button class="sf-hub-card" onclick="navigateTo('${c.id}')">
+                <div class="sf-hub-icon">${c.icon}</div>
+                <div class="sf-hub-name">${c.label}</div>
+                <div class="sf-hub-desc">${c.desc}</div>
+              </button>`).join('')}
+          </div>
+          ${cards.length === 0 ? `
+          <div class="card" style="text-align:center;padding:2rem 1rem">
+            <div style="font-size:2rem">🔒</div>
+            <div style="font-weight:600;margin-top:0.5rem">No NAFAS access</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem">Ask the admin to grant you permissions</div>
+          </div>` : ''}
+        </div>`;
+    }
+
+    function setActiveTab(id) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(`nav-${id}`)?.classList.add('active');
     }
 
     function navigateTo(view) {
       currentView = view;
 
-      // The NAFAS tab itself opens the user's default view
-      if (view === 'nafas') {
-        view = can('viewDashboard') ? 'dashboard' : (can('sellMain') ? 'sale' : 'stock');
-      }
-
       // Primary tab switch: NAFAS / SOLID FLEX / USERS (permission-guarded)
       if (view === 'solidflex' && !canSeeSolidFlex()) view = 'nafas';
       if (view === 'users' && role !== 'admin') view = 'nafas';
       if (view === 'solidflex') {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.getElementById('nav-solidflex')?.classList.add('active');
-        document.getElementById('sub-nav').style.display = 'none';
+        setActiveTab('solidflex');
         window.SF && SF.open('hub');
         return;
       }
       if (view === 'users') {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        document.getElementById('nav-users')?.classList.add('active');
-        document.getElementById('sub-nav').style.display = 'none';
+        setActiveTab('users');
         renderUsers();
         return;
       }
+      if (view === 'nafas') {
+        setActiveTab('nafas');
+        renderNafasHub();
+        return;
+      }
 
-      // NAFAS sub-view
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      document.getElementById('nav-nafas')?.classList.add('active');
-      document.getElementById('sub-nav').style.display = 'flex'; // restore if hidden by SF/Users tab
-      document.querySelectorAll('.sub-pill').forEach(el => el.classList.remove('active'));
-      document.getElementById(`subpill-${view}`)?.classList.add('active');
+      // NAFAS sub-view (opened from the hub cards)
+      setActiveTab('nafas');
 
       const views = {
         dashboard: renderDashboard,
