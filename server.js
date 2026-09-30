@@ -31,6 +31,13 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 // SOLID FLEX module (additive, namespaced — safe to remove for rollback)
 app.use('/api/solidflex', require('./routes/solidflex'));
 
+// Liveness probe — cheap, unauthenticated, DB-independent (leaks no data,
+// never 500s on DB trouble). Used by uptime monitors and the keep-alive
+// pinger below. Must stay registered BEFORE the catch-all route.
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime() });
+});
+
 // Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -40,6 +47,31 @@ app.get('*', (req, res) => {
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => console.log(`🚀 NAFAS Server running on port ${PORT}`));
+
+  // Keep-alive: ping ourselves periodically so free hosts (e.g. Render free
+  // tier) don't spin the service down after 15 idle minutes. Opt-in via env:
+  //   KEEP_ALIVE=true                                  → ping own /healthz
+  //   KEEP_ALIVE_URL=https://nafas-pos.onrender.com/healthz  → ping any URL
+  const keepAliveUrl = process.env.KEEP_ALIVE_URL
+    || (process.env.KEEP_ALIVE === 'true' ? `http://127.0.0.1:${PORT}/healthz` : null);
+  if (keepAliveUrl) {
+    const minutes = Number(process.env.KEEP_ALIVE_INTERVAL_MINUTES) || 10;
+    let inFlight = false;
+    const ping = async () => {
+      if (inFlight) return; // never stack pings if one hangs
+      inFlight = true;
+      try {
+        const res = await fetch(keepAliveUrl);
+        if (!res.ok) console.warn(`⚠️ Keep-alive ping got HTTP ${res.status}`);
+      } catch (err) {
+        console.warn(`⚠️ Keep-alive ping failed: ${err.message}`);
+      } finally {
+        inFlight = false;
+      }
+    };
+    setInterval(ping, minutes * 60 * 1000).unref(); // never blocks process exit
+    console.log(`💓 Keep-alive pinging ${keepAliveUrl} every ${minutes} min`);
+  }
 }
 
 module.exports = app;
