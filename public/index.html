@@ -1285,6 +1285,8 @@
       touch-action: manipulation;
     }
 
+    /* NAFAS reuses SOLID FLEX's .sf-hub / .sf-hub-card styles (solidflex.css) */
+
     @supports (padding: max(0px)) {
       .bottom-nav {
         padding-bottom: max(0.4rem, env(safe-area-inset-bottom));
@@ -1348,7 +1350,7 @@
     </div>
 
     <nav class="bottom-nav" id="bottom-nav">
-      <!-- Dynamic nav based on role -->
+      <!-- Primary tabs: NAFAS / SOLID FLEX / USERS -->
     </nav>
   </div>
 
@@ -1412,14 +1414,6 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div class="form-group">
-          <label class="form-label">Category</label>
-          <select class="form-select" id="p-category">
-            <option value="Attar">Attar</option>
-            <option value="Apparel">Apparel</option>
-            <option value="Gadget">Gadget</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label class="form-label">Grade</label>
           <select class="form-select" id="p-grade">
             <option value="">—</option>
@@ -1428,18 +1422,9 @@
             <option value="C">C</option>
           </select>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div class="form-group">
-          <label class="form-label">Stock (ml/pcs)</label>
+          <label class="form-label">Stock (ml)</label>
           <input class="form-input" type="number" id="p-stock" placeholder="0" />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Unit</label>
-          <select class="form-select" id="p-unit">
-            <option value="ml">ml</option>
-            <option value="piece">piece</option>
-          </select>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
@@ -1560,54 +1545,6 @@
     </div>
   </div>
 
-  <!-- ═══ BRANCH MODAL ═══ -->
-  <div class="modal-overlay" id="branch-modal">
-    <div class="modal">
-      <div class="modal-handle"></div>
-      <div class="modal-title">Add Branch</div>
-      <div class="form-group">
-        <label class="form-label">Branch Name *</label>
-        <input class="form-input" id="branch-name" placeholder="e.g. Tanjim Branch" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Location</label>
-        <input class="form-input" id="branch-location" placeholder="e.g. Mirpur, Dhaka" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Notes</label>
-        <input class="form-input" id="branch-notes" placeholder="Optional" />
-      </div>
-      <div style="display:flex;gap:0.5rem">
-        <button class="btn btn-outline" style="flex:1" onclick="closeModal('branch-modal')">Cancel</button>
-        <button class="btn btn-primary" style="flex:1" onclick="saveBranch()">Save Branch</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══ STOCK TRANSFER MODAL ═══ -->
-  <div class="modal-overlay" id="transfer-modal">
-    <div class="modal" style="max-height:88vh">
-      <div class="modal-handle"></div>
-      <div class="modal-title" id="transfer-modal-title">Transfer Stock</div>
-      <input type="hidden" id="transfer-branch-id" />
-
-      <div style="display:flex;gap:0.4rem;margin-bottom:0.75rem">
-        <button class="period-tab active" id="transfer-give-tab" onclick="setTransferDir('give')">Give to
-          Branch</button>
-        <button class="period-tab" id="transfer-return-tab" onclick="setTransferDir('return')">Return to Main</button>
-      </div>
-      <div id="transfer-product-list">
-        <div class="loading-center">
-          <div class="spinner"></div>
-        </div>
-      </div>
-      <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
-        <button class="btn btn-outline" style="flex:1" onclick="closeModal('transfer-modal')">Cancel</button>
-        <button class="btn btn-primary" style="flex:1" onclick="executeTransfer()">Confirm Transfer</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ USER MANAGEMENT MODAL ═══ -->
   <div class="modal-overlay" id="user-modal">
     <div class="modal"
@@ -1631,13 +1568,6 @@
         style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;padding:0.65rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border)">
         <input type="checkbox" id="u-active" checked style="width:16px;height:16px;accent-color:var(--gold)" />
         <label for="u-active" style="font-size:0.85rem;cursor:pointer">User is Active (can log in)</label>
-      </div>
-
-      <div class="form-group" style="margin-bottom:0.75rem">
-        <label class="form-label">Assigned Branch</label>
-        <select class="form-select" id="u-branch">
-          <option value="">No branch (Main Store access)</option>
-        </select>
       </div>
 
       <!-- Quick presets -->
@@ -1679,11 +1609,6 @@
         </label>
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-          <input type="checkbox" id="perm-sellBranch" style="width:16px;height:16px;accent-color:var(--gold)" />
-          <span style="font-size:0.82rem">Record Sales (Branch)</span>
-        </label>
-        <label
-          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
           <input type="checkbox" id="perm-addProducts" style="width:16px;height:16px;accent-color:var(--gold)" />
           <span style="font-size:0.82rem">Add / Edit Products</span>
         </label>
@@ -1691,11 +1616,6 @@
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
           <input type="checkbox" id="perm-manageCosts" style="width:16px;height:16px;accent-color:var(--gold)" />
           <span style="font-size:0.82rem">Manage Costs</span>
-        </label>
-        <label
-          style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
-          <input type="checkbox" id="perm-transferStock" style="width:16px;height:16px;accent-color:var(--gold)" />
-          <span style="font-size:0.82rem">Transfer Stock to Branch</span>
         </label>
         <label
           style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.75rem;background:var(--dark-3);border-radius:8px;border:1px solid var(--border);cursor:pointer">
@@ -1736,23 +1656,6 @@
           <span style="color:var(--text-muted);font-size:0.7rem">Example: Ehsas Al Arabia, A, 435, 1450, 220, 2nd
             LOT</span>
         </p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem">
-          <div>
-            <label class="form-label">Category</label>
-            <select class="form-select" id="imp-category">
-              <option value="Attar">Attar</option>
-              <option value="Apparel">Apparel</option>
-              <option value="Gadget">Gadget</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label">Unit</label>
-            <select class="form-select" id="imp-unit">
-              <option value="ml">ml</option>
-              <option value="piece">piece</option>
-            </select>
-          </div>
-        </div>
         <textarea id="imp-products-text" class="form-input" rows="8"
           placeholder="Ehsas Al Arabia, A, 435, 1450, 220, 2nd LOT&#10;Dior Sauvage, A, 270, 900, 180, 1st LOT&#10;Cool Water, B, 180, 600, 120, 1st LOT&#10;Versace, A, 600, 2000, 300, 1st LOT"
           style="resize:vertical;font-size:0.78rem;font-family:monospace;line-height:1.6"></textarea>
@@ -1858,13 +1761,11 @@
     let allProducts = [];
     let allCombos = [];
     let overrideTarget = null;
-    let allBranches = []; // loaded on init
-    let activeBranchId = null; // null = main store
-    let activeBranchName = 'Main Store';
+    // (branch system removed — single-store operation; legacy branch data stays in DB)
 
     // Persist cart so an accidental refresh/back doesn't lose a half-built sale
     function saveCart() {
-      try { localStorage.setItem('nafas_cart', JSON.stringify({ items: cart, branchId: activeBranchId, branchName: activeBranchName })); } catch (e) { }
+      try { localStorage.setItem('nafas_cart', JSON.stringify({ items: cart })); } catch (e) { }
     }
 
     function loadSavedCart() {
@@ -1878,10 +1779,6 @@
     function restoreCartBranch() {
       try {
         const saved = JSON.parse(localStorage.getItem('nafas_cart') || 'null');
-        if (saved && saved.branchId !== undefined && !userPerms?.assignedBranchId) {
-          activeBranchId = saved.branchId;
-          activeBranchName = saved.branchName || 'Main Store';
-        }
         return Array.isArray(saved?.items) && saved.items.length > 0;
       } catch (e) { return false; }
     }
@@ -2012,49 +1909,29 @@
       const displayName = userName || (role === 'admin' ? 'Tanjim' : 'User');
       document.getElementById('topbar-role').textContent = role === 'admin'
         ? `♛ ${displayName}` : `👤 ${displayName}`;
-      // Load branches first, then build nav
-      loadBranchesAndInit();
+      // Initialize app data, then build nav
+      loadAppData();
     }
 
-    async function loadBranchesAndInit() {
-      // Restore a half-built sale from before a refresh, before branch logic overrides the store
+    async function loadAppData() {
+      // Restore a half-built sale from before a refresh
       const restoredCart = restoreCartBranch();
-      try {
-        allBranches = await apiFetch('/api/branches') || [];
-        // If user has assignedBranch, auto-select it
-        if (userPerms?.assignedBranchId) {
-          const assigned = allBranches.find(b => b._id === userPerms.assignedBranchId);
-          if (assigned) {
-            activeBranchId = assigned._id;
-            activeBranchName = assigned.name;
-          }
-        }
-      } catch (e) {
-        allBranches = [];
-      }
       buildNav();
-      navigateTo(role === 'admin' ? 'dashboard' : (can('sellMain') || can('sellBranch') ? 'sale' : 'stock'));
+      navigateTo('nafas');
       if (restoredCart) {
         navigateTo('sale');
         showToast('🛒 Restored your unfinished sale', 'success');
       }
     }
 
+    // ── Primary tabs (bottom bar): NAFAS / SOLID FLEX / USERS ──
+    const canSeeSolidFlex = () => role === 'admin' || Object.keys(userPerms || {}).some(k => k.startsWith('sf') && userPerms[k]);
+
     function buildNav() {
       const nav = document.getElementById('bottom-nav');
-      const items = [];
-      if (can('viewDashboard')) items.push({ id: 'dashboard', icon: 'dashboard', label: 'Dashboard' });
-      if (can('sellMain') || can('sellBranch')) items.push({ id: 'sale', icon: 'sale', label: 'Sale' });
-      if (can('viewStock') || can('addProducts')) items.push({ id: 'products', icon: 'products', label: 'Products' });
-      if (can('viewHistory')) items.push({ id: 'history', icon: 'history', label: 'History' });
-      if (can('manageCosts')) items.push({ id: 'costs', icon: 'costs', label: 'Costs' });
-      if (role === 'admin') items.push({ id: 'users', icon: 'users', label: 'Users' });
-      // SOLID FLEX module entry (visible to admin or any user with an sf* permission)
-      if (role === 'admin' || Object.keys(userPerms || {}).some(k => k.startsWith('sf') && userPerms[k])) {
-        items.push({ id: 'solidflex', icon: 'solidflex', label: 'SolidFlex' });
-      }
-      if (items.length === 0) items.push({ id: 'stock', icon: 'stock', label: 'Stock' });
-
+      const items = [{ id: 'nafas', icon: 'products', label: 'NAFAS' }];
+      if (canSeeSolidFlex()) items.push({ id: 'solidflex', icon: 'solidflex', label: 'SOLID FLEX' });
+      if (role === 'admin') items.push({ id: 'users', icon: 'users', label: 'USERS' });
       nav.innerHTML = items.map(item => `
     <button class="nav-item" id="nav-${item.id}" onclick="navigateTo('${item.id}')">
       <span class="nav-icon">${ICONS[item.icon]}</span>
@@ -2063,11 +1940,71 @@
   `).join('');
     }
 
+    // ── NAFAS hub — mirrors the SOLID FLEX card hub (reuses .sf-hub styles) ──
+    function renderNafasHub() {
+      const cards = [
+        { id: 'dashboard', icon: '📊', label: 'Dashboard', desc: 'Revenue overview', gate: () => can('viewDashboard') },
+        { id: 'sale', icon: '🛒', label: 'Sale', desc: 'New sale entry', gate: () => can('sellMain') },
+        { id: 'products', icon: '📦', label: 'Products', desc: 'Stock & pricing', gate: () => can('viewStock') || can('addProducts') },
+        { id: 'history', icon: '🧾', label: 'History', desc: 'Past sales & exports', gate: () => can('viewHistory') },
+        { id: 'costs', icon: '💸', label: 'Costs', desc: 'Operational costs', gate: () => can('manageCosts') },
+        { id: 'bottles', icon: '🍶', label: 'Bottles', desc: 'Empty bottle stock', gate: () => can('viewStock') || can('addProducts') },
+      ].filter(c => c.gate());
+
+      document.getElementById('main-content').innerHTML = `
+        <div class="sf-wrap">
+          <div class="sf-brandbar">
+            <div>
+              <div class="sf-title">NAFAS <span class="sf-badge">NF</span></div>
+              <div class="sf-sub">Fragrance & Attar POS</div>
+            </div>
+          </div>
+          <div class="sf-hub">
+            ${cards.map(c => `
+              <button class="sf-hub-card" onclick="navigateTo('${c.id}')">
+                <div class="sf-hub-icon">${c.icon}</div>
+                <div class="sf-hub-name">${c.label}</div>
+                <div class="sf-hub-desc">${c.desc}</div>
+              </button>`).join('')}
+          </div>
+          ${cards.length === 0 ? `
+          <div class="card" style="text-align:center;padding:2rem 1rem">
+            <div style="font-size:2rem">🔒</div>
+            <div style="font-weight:600;margin-top:0.5rem">No NAFAS access</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem">Ask the admin to grant you permissions</div>
+          </div>` : ''}
+        </div>`;
+    }
+
+    function setActiveTab(id) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(`nav-${id}`)?.classList.add('active');
+    }
+
     function navigateTo(view) {
       currentView = view;
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      const navEl = document.getElementById(`nav-${view}`);
-      if (navEl) navEl.classList.add('active');
+
+      // Primary tab switch: NAFAS / SOLID FLEX / USERS (permission-guarded)
+      if (view === 'solidflex' && !canSeeSolidFlex()) view = 'nafas';
+      if (view === 'users' && role !== 'admin') view = 'nafas';
+      if (view === 'solidflex') {
+        setActiveTab('solidflex');
+        window.SF && SF.open('hub');
+        return;
+      }
+      if (view === 'users') {
+        setActiveTab('users');
+        renderUsers();
+        return;
+      }
+      if (view === 'nafas') {
+        setActiveTab('nafas');
+        renderNafasHub();
+        return;
+      }
+
+      // NAFAS sub-view (opened from the hub cards)
+      setActiveTab('nafas');
 
       const views = {
         dashboard: renderDashboard,
@@ -2077,8 +2014,6 @@
         costs: renderCosts,
         stock: renderStockView,
         bottles: renderBottles,
-        users: renderUsers,
-        solidflex: () => window.SF && SF.open('hub'), // SOLID FLEX module
       };
 
       const fn = views[view];
@@ -2209,50 +2144,8 @@
     async function renderSaleEntry() {
       const el = document.getElementById('main-content');
 
-      // Build store buttons dynamically from branches
-      const canMain = can('sellMain');
-      const canBranch = can('sellBranch');
-
-      // Available stores for this user
-      const stores = [];
-      if (canMain) stores.push({ id: null, name: 'Main Store', sub: 'Main Warehouse' });
-      if (canBranch) {
-        // If user has assigned branch, only show that
-        if (userPerms?.assignedBranchId) {
-          const b = allBranches.find(x => x._id === userPerms.assignedBranchId);
-          if (b) stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' });
-        } else {
-          // Admin or unassigned - show all branches
-          allBranches.forEach(b => stores.push({ id: b._id, name: b.name, sub: b.location || 'Branch' }));
-        }
-      }
-
-      // If only one store, auto-select it
-      if (stores.length === 1 && activeBranchId === null && stores[0].id !== null) {
-        activeBranchId = stores[0].id;
-        activeBranchName = stores[0].name;
-      }
-
-      const cols = stores.length > 1 ? `repeat(${Math.min(stores.length, 3)}, 1fr)` : '1fr';
-
       el.innerHTML = `
-    <!-- STORE SELECTOR -->
-    ${stores.length > 0 ? `
-    <div style="display:grid;grid-template-columns:${cols};gap:0.5rem;margin-bottom:0.75rem">
-      ${stores.map(s => {
-        const isActive = activeBranchId === s.id;
-        return `<button onclick="setSaleStore('${s.id}', '${s.name}')"
-          style="padding:0.85rem;border-radius:var(--radius);
-          border:2px solid ${isActive ? 'var(--gold)' : 'var(--border)'};
-          background:${isActive ? 'var(--gold-dim)' : 'var(--card)'};
-          color:${isActive ? 'var(--gold)' : 'var(--text-muted)'};
-          font-family:DM Sans,sans-serif;font-weight:600;cursor:pointer;font-size:0.85rem;
-          transition:all 0.15s;text-align:center">
-          ${s.id === null ? '🏪' : '🏬'} ${s.name}
-          <div style="font-size:0.62rem;font-weight:400;margin-top:0.2rem;opacity:0.75">${s.sub}</div>
-        </button>`;
-      }).join('')}
-    </div>` : ''}
+    <!-- STORE SELECTOR removed — single-store operation -->
 
     <div class="card">
       <div class="card-title">${icon('customer')}Customer Info</div>
@@ -2289,9 +2182,6 @@
 
     <div class="card">
       <div class="card-title">${icon('cart')}Items
-        <span style="font-size:0.65rem;font-weight:400;color:var(--text-muted);margin-left:0.5rem">
-          from ${activeBranchId ? `🏬 ${activeBranchName}` : '🏪 Main Store'}
-        </span>
       </div>
       <div id="cart-items">
         <div class="empty-state" style="padding:1.25rem">
@@ -2343,7 +2233,7 @@
     </div>
 
     <button class="btn btn-primary btn-block" style="padding:1rem;font-size:1rem;margin-bottom:1rem" onclick="submitSale()">
-      ✓ Record ${activeBranchId ? activeBranchName : 'Main Store'} Sale
+      ✓ Record Sale
     </button>
   `;
 
@@ -2352,15 +2242,6 @@
         if (d) d.value = new Date().toISOString().split('T')[0];
       }, 50);
       renderCartItems();
-    }
-
-    function setSaleStore(branchId, branchName) {
-      // branchId is the string 'null' from onclick attr when main store
-      activeBranchId = (branchId === 'null' || branchId === null) ? null : branchId;
-      activeBranchName = branchName || 'Main Store';
-      cart = [];
-      saveCart();
-      renderSaleEntry();
     }
 
     function renderCartItems() {
@@ -2467,6 +2348,8 @@
           apiFetch('/api/products'),
           apiFetch('/api/combos')
         ]);
+        // Attar-only: legacy Apparel/Gadget items are hidden from sale
+        allProducts = allProducts.filter(p => p.category === 'Attar');
         renderItemList(allProducts, allCombos);
       } catch (err) {
         document.getElementById('item-list-container').innerHTML = `<p class="text-danger" style="text-align:center;padding:1rem">${err.message}</p>`;
@@ -2505,18 +2388,15 @@
         products.forEach(p => {
           const idx = _itemCache.push(p) - 1;
           _itemCacheTypes.push('Product');
-          // Show Tanjim's stock if Tanjim store is active
-          let displayStock = p.stock; // default main
-          if (activeBranchId) {
-            const entry = (p.branchStock || []).find(b => b.branchId === activeBranchId);
-            displayStock = entry ? entry.qty : 0;
-          } const stockClass = displayStock <= p.lowStockAlert ? 'stock-low' : 'stock-ok';
+          // Single-store operation — always show main stock
+          let displayStock = p.stock;
+          const stockClass = displayStock <= p.lowStockAlert ? 'stock-low' : 'stock-ok';
           const stockLabel = `${displayStock}${p.unit}`;
           html += `
         <div class="item-row selectable-item" data-idx="${idx}" style="${displayStock <= 0 ? 'opacity:0.4;pointer-events:none' : ''}">
           <div>
             <div class="item-name">${p.name}${p.grade ? `<span class="grade-badge">${p.grade}</span>` : ''}</div>
-            <div class="item-meta">৳${p.sellingPrice}/3.5ml · ${p.category}</div>
+                <div class="item-meta">৳${p.sellingPrice}/3.5ml</div>
           </div>
           <div class="item-stock ${stockClass}">${stockLabel}</div>
         </div>`;
@@ -2658,8 +2538,6 @@
         customerPhone: form.customerPhone,
         channel: form.channel,
         notes: form.notes,
-        branchId: activeBranchId || null,
-        branchName: activeBranchName || 'Main Store',
         date: document.getElementById('sale-date')?.value || new Date().toISOString(),
         items: cart.map(i => ({
           itemId: i.itemId,
@@ -2687,7 +2565,6 @@
       const summaryEl = document.getElementById('confirm-sale-summary');
       summaryEl.innerHTML = `
         <div class="confirm-row"><span>Customer</span><span>${_pendingSale.customerName}</span></div>
-        <div class="confirm-row"><span>Store</span><span>${activeBranchId ? `🏬 ${activeBranchName}` : '🏪 Main Store'}</span></div>
         ${cart.map(i => `<div class="confirm-row">
           <span>${i.name}${i.isOverridden ? ' <small style="color:var(--text-muted)">(custom price)</small>' : ''}</span>
           <span>×${i.qty}${i.itemType === 'Combo' ? '' : (i.unit === 'piece' ? ' pcs' : ' ml')}
@@ -2724,7 +2601,7 @@
     // ===============================================
     //  PRODUCTS (Admin)
     // ===============================================
-    let productFilter = 'all';
+    let productFilter = 'all'; // Attar-only app — 'all' now means all Attar products
 
     async function renderProducts() {
       const el = document.getElementById('main-content');
@@ -2733,8 +2610,6 @@
       <div class="period-tabs" style="margin:0;flex:1">
         <button class="period-tab ${productFilter === 'all' ? 'active' : ''}" onclick="setProductFilter('all')">All</button>
         <button class="period-tab ${productFilter === 'Attar' ? 'active' : ''}" onclick="setProductFilter('Attar')">Attar</button>
-        <button class="period-tab ${productFilter === 'Apparel' ? 'active' : ''}" onclick="setProductFilter('Apparel')">Apparel</button>
-        <button class="period-tab ${productFilter === 'Gadget' ? 'active' : ''}" onclick="setProductFilter('Gadget')">Gadget</button>
       </div>
     </div>
     <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
@@ -2752,7 +2627,7 @@
         el.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
         <div class="period-tabs" style="margin:0;flex:1">
-          ${['all', 'Attar', 'Apparel', 'Gadget'].map(f => `<button class="period-tab ${productFilter === f ? 'active' : ''}" onclick="setProductFilter('${f}')">${f === 'all' ? 'All' : f}</button>`).join('')}
+          ${['all', 'Attar'].map(f => `<button class="period-tab ${productFilter === f ? 'active' : ''}" onclick="setProductFilter('${f}')">${f === 'all' ? 'All' : f}</button>`).join('')}
         </div>
       </div>
 <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
@@ -2760,7 +2635,6 @@
         <button class="btn btn-success btn-sm" onclick="openModal('combo-modal');loadComboProductOptions()">+ Combo</button>
         <button class="btn btn-outline btn-sm" onclick="openImportModal()">📥 Import</button>
         <button class="btn btn-outline btn-sm" onclick="navigateTo('bottles')">🍶 Bottles</button>
-        ${allBranches.length > 0 ? `<button class="btn btn-outline btn-sm" onclick="openBranchTransferPicker()">🔄 Transfer Stock</button>` : ''}
       </div>
       <div class="card" style="margin-bottom:0.75rem">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2832,8 +2706,6 @@
       } else {
         ['p-name', 'p-stock', 'p-purchase', 'p-sell', 'p-lot', 'p-notes'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('p-grade').value = '';
-        document.getElementById('p-category').value = 'Attar';
-        document.getElementById('p-unit').value = 'ml';
         document.getElementById('p-lowstock').value = '10';
       }
       openModal('product-modal');
@@ -2843,10 +2715,9 @@
       const id = document.getElementById('product-edit-id').value;
       const body = {
         name: document.getElementById('p-name').value.trim(),
-        category: document.getElementById('p-category').value,
+        category: 'Attar',
+        unit: 'ml',
         grade: document.getElementById('p-grade').value,
-        stock: parseFloat(document.getElementById('p-stock').value) || 0,
-        unit: document.getElementById('p-unit').value,
         purchaseRate: parseFloat(document.getElementById('p-purchase').value) || 0,
         sellingPrice: parseFloat(document.getElementById('p-sell').value) || 0,
         lowStockAlert: parseFloat(document.getElementById('p-lowstock').value) || 10,
@@ -3049,7 +2920,7 @@
 
     // --- Combo ---
     async function loadComboProductOptions() {
-      allProducts = await apiFetch('/api/products') || [];
+      allProducts = ((await apiFetch('/api/products')) || []).filter(p => p.category === 'Attar');
       const container = document.getElementById('combo-products-list');
       container.innerHTML = '';
       addComboProductRow();
@@ -3573,7 +3444,7 @@
       ${low.length ? `<div class="alert-banner">⚠️ ${low.length} item(s) low on stock</div>` : ''}
       <div class="card">
         <div class="card-title">${icon('stock')}Current Stock</div>
-        ${data.products.map(p => `
+        ${data.products.filter(p => p.category === 'Attar').map(p => `
           <div class="item-row">
             <div class="item-name">${p.name}</div>
             <span class="item-stock ${p.stock <= p.lowStockAlert ? 'stock-low' : 'stock-ok'}">${p.stock}${p.unit}</span>
@@ -3621,10 +3492,8 @@
       { key: 'viewStock', label: 'View Stock' },
       { key: 'viewHistory', label: 'View Sale History' },
       { key: 'sellMain', label: 'Record Sales (Main Store)' },
-      { key: 'sellBranch', label: 'Record Sales (Branch)' },
       { key: 'addProducts', label: 'Add / Edit Products' },
       { key: 'manageCosts', label: 'Manage Costs' },
-      { key: 'transferStock', label: 'Transfer Stock to Branch' },
       { key: 'deleteSales', label: 'Delete Sales' },
     ];
 
@@ -3633,33 +3502,9 @@
       const el = document.getElementById('main-content');
       el.innerHTML = `<div class="loading-center"><div class="spinner"></div></div>`;
       try {
-        const [users, branches] = await Promise.all([
-          apiFetch('/api/users'),
-          apiFetch('/api/branches')
-        ]);
+        const users = await apiFetch('/api/users');
 
         el.innerHTML = `
-      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="openUserModal()">+ Add User</button>
-        <button class="btn btn-outline btn-sm" onclick="openBranchModal()">+ Add Branch</button>
-      </div>
-
-      ${branches.length > 0 ? `
-      <div class="card" style="margin-bottom:0.75rem">
-        <div class="card-title">Branches</div>
-        ${branches.map(b => `
-          <div class="flex-between" style="padding:0.5rem 0;border-bottom:1px solid var(--border)">
-            <div>
-              <div style="font-weight:500;font-size:0.88rem">${b.name}</div>
-              <div style="font-size:0.72rem;color:var(--text-muted)">${b.location || 'No location'}</div>
-            </div>
-            <div style="display:flex;gap:0.3rem">
-              <button class="btn btn-danger btn-sm" onclick="deleteBranch('${b._id}', '${b.name}')">Del</button>
-            </div>
-          </div>
-        `).join('')}
-      </div>` : ''}
-
       <div class="card">
         <div class="card-title">Users</div>
         ${users.length === 0 ? `
@@ -3667,7 +3512,6 @@
             <div class="empty-text">No users yet.</div>
           </div>` :
             users.map(u => {
-              const assignedBranch = branches.find(b => b._id === u.assignedBranch);
               return `
             <div class="item-row">
               <div style="flex:1">
@@ -3678,7 +3522,6 @@
                     color:${u.isActive ? 'var(--success)' : 'var(--danger)'}">
                     ${u.isActive ? 'Active' : 'Inactive'}
                   </span>
-                  ${assignedBranch ? `<span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem;background:var(--gold-dim);color:var(--gold)">${assignedBranch.name}</span>` : ''}
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-top:0.35rem">
                   ${ALL_PERMS.filter(p => u.permissions?.[p.key]).map(p =>
@@ -3729,12 +3572,6 @@
           if (u) {
             document.getElementById('u-name').value = u.name;
             document.getElementById('u-active').checked = u.isActive;
-            // Load branches and set assigned branch
-            const branches = await apiFetch('/api/branches') || [];
-            const branchSel = document.getElementById('u-branch');
-            branchSel.innerHTML = `<option value="">No branch (Main Store access)</option>` +
-              branches.map(b => `<option value="${b._id}">${b.name}</option>`).join('');
-            if (u.assignedBranch) branchSel.value = u.assignedBranch;
             // Restore saved permissions & PIN placeholder on edit
             ALL_PERMS.forEach(p => {
               const el = document.getElementById(`perm-${p.key}`);
@@ -3769,8 +3606,7 @@
       const body = {
         name,
         permissions,
-        isActive,
-        assignedBranch: document.getElementById('u-branch').value || null
+        isActive
       };
       if (pin) body.pin = pin;
 
@@ -3803,158 +3639,14 @@
     // Quick permission presets
     function applyPreset(preset) {
       const presets = {
-        saleOnly: ['sellBranch', 'viewStock'],
-        fullSales: ['sellMain', 'sellBranch', 'viewStock', 'viewHistory'],
-        manager: ['viewDashboard', 'sellMain', 'sellBranch', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts', 'transferStock'],
+        saleOnly: ['viewStock'],
+        fullSales: ['sellMain', 'viewStock', 'viewHistory'],
+        manager: ['viewDashboard', 'sellMain', 'viewStock', 'viewHistory', 'addProducts', 'manageCosts'],
       };
       ALL_PERMS.forEach(p => {
         const el = document.getElementById(`perm-${p.key}`);
         if (el) el.checked = (presets[preset] || []).includes(p.key);
       });
-    }
-
-    // ===============================================
-    // BRANCH MANAGEMENT
-    // ===============================================
-    function openBranchModal() {
-      document.getElementById('branch-name').value = '';
-      document.getElementById('branch-location').value = '';
-      document.getElementById('branch-notes').value = '';
-      openModal('branch-modal');
-    }
-
-    async function saveBranch() {
-      const name = document.getElementById('branch-name').value.trim();
-      if (!name) return showToast('Branch name required', 'error');
-      try {
-        await apiFetch('/api/branches', {
-          method: 'POST',
-          body: JSON.stringify({
-            name,
-            location: document.getElementById('branch-location').value,
-            notes: document.getElementById('branch-notes').value
-          })
-        });
-        allBranches = await apiFetch('/api/branches') || [];
-        showToast(`✓ ${name} branch created`, 'success');
-        closeModal('branch-modal');
-        renderUsers();
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
-    }
-
-    async function deleteBranch(id, name) {
-      if (!confirm(`Delete "${name}" branch? All its stock will return to Main Store.`)) return;
-      try {
-        await apiFetch(`/api/branches/${id}`, { method: 'DELETE' });
-        allBranches = await apiFetch('/api/branches') || [];
-        showToast(`${name} deleted, stock returned to main`, 'success');
-        renderUsers();
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
-    }
-
-    async function openBranchTransferPicker() {
-      if (allBranches.length === 0) {
-        showToast('No branches yet. Add a branch first in Users tab.', 'error');
-        return;
-      }
-      if (allBranches.length === 1) {
-        // Only one branch — open transfer directly
-        openTransferModal(allBranches[0]._id, allBranches[0].name);
-        return;
-      }
-      // Multiple branches — show picker
-      const branchName = allBranches.map((b, i) => `${i + 1}. ${b.name}`).join('\n');
-      const choice = prompt(`Select branch number:\n${branchName}`);
-      const idx = parseInt(choice) - 1;
-      if (idx >= 0 && idx < allBranches.length) {
-        openTransferModal(allBranches[idx]._id, allBranches[idx].name);
-      }
-    }
-
-    // --- Stock Transfer ---
-    let transferDir = 'give';
-    let transferBranchId = null;
-
-    function setTransferDir(dir) {
-      transferDir = dir;
-      document.getElementById('transfer-give-tab').classList.toggle('active', dir === 'give');
-      document.getElementById('transfer-return-tab').classList.toggle('active', dir === 'return');
-      loadTransferProducts();
-    }
-
-    async function openTransferModal(branchId, branchName) {
-      transferBranchId = branchId;
-      transferDir = 'give';
-      document.getElementById('transfer-branch-id').value = branchId;
-      document.getElementById('transfer-modal-title').textContent = `Transfer Stock — ${branchName}`;
-      document.getElementById('transfer-give-tab').classList.add('active');
-      document.getElementById('transfer-return-tab').classList.remove('active');
-      openModal('transfer-modal');
-      await loadTransferProducts();
-    }
-
-    async function loadTransferProducts() {
-      const container = document.getElementById('transfer-product-list');
-      container.innerHTML = '<div class="loading-center"><div class="spinner"></div></div>';
-      try {
-        const products = await apiFetch('/api/products');
-        const attars = products.filter(p => p.category === 'Attar' && p.isActive !== false);
-
-        container.innerHTML = attars.map((p, i) => {
-          const branchEntry = (p.branchStock || []).find(b => b.branchId === transferBranchId);
-          const branchQty = branchEntry ? branchEntry.qty : 0;
-          const available = transferDir === 'give' ? p.stock : branchQty;
-          return `
-      <div style="padding:0.6rem 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
-          <div>
-            <span style="font-weight:500;font-size:0.85rem">${p.name}</span>
-            ${p.grade ? `<span
-              style="font-size:0.65rem;background:var(--gold-dim);color:var(--gold);padding:0.1rem 0.35rem;border-radius:4px;margin-left:0.3rem">${p.grade}</span>`
-              : ''}
-          </div>
-          <span style="font-size:0.75rem;color:${available > 0 ? 'var(--success)' : 'var(--danger)'}">
-            ${transferDir === 'give' ? 'Main' : 'Branch'}: ${available}${p.unit}
-          </span>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.4rem">
-          <span style="font-size:0.72rem;color:var(--text-muted);min-width:55px">Transfer:</span>
-          ${[3.5, 6, 12, 15].map(qty => `
-          <button class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.72rem"
-            onclick="document.getElementById('tr-qty-${i}').value=${qty}">${qty}ml</button>
-          `).join('')}
-          <input class="form-input" type="number" id="tr-qty-${i}" data-product-id="${p._id}" placeholder="0" step="0.5"
-            min="0" value="0" style="width:65px;padding:0.25rem 0.4rem;font-size:0.8rem" />
-        </div>
-      </div>`;
-        }).join('') || '<div class="empty-state"><div class="empty-text">No products found</div></div>';
-      } catch (err) {
-        container.innerHTML = `<p class="text-danger">${err.message}</p>`;
-      }
-    }
-
-    async function executeTransfer() {
-      const inputs = document.querySelectorAll('#transfer-product-list input[type="number"]');
-      let transferred = 0;
-      const errors = [];
-
-      for (const inp of inputs) {
-        const qty = parseFloat(inp.value) || 0;
-        if (qty <= 0) continue; const productId = inp.dataset.productId; try {
-          await apiFetch('/api/branches/transfer', {
-            method: 'POST', body: JSON.stringify({ branchId: transferBranchId, productId, qty, direction: transferDir })
-          }); transferred++;
-        } catch (err) { errors.push(err.message); }
-      } if (transferred > 0) {
-        showToast(`✓ ${transferred} product(s) transferred`, 'success');
-        allBranches = await apiFetch('/api/branches') || [];
-      }
-      if (errors.length) showToast(errors[0], 'error');
-      if (transferred > 0) closeModal('transfer-modal');
     }
 
     // ===============================================
@@ -3991,8 +3683,8 @@
 
     // -- Parse helpers --
     function parseProductLines(raw) {
-      const category = document.getElementById('imp-category').value;
-      const unit = document.getElementById('imp-unit').value;
+      const category = 'Attar'; // Attar-only app
+      const unit = 'ml';
       const rows = [];
       const errors = [];
 
@@ -4007,7 +3699,7 @@
         const sellingPrice = parseFloat(sellRaw);
         if (!name) { errors.push(`Line ${i + 1}: Name is empty`); return; }
         if (isNaN(stock) || isNaN(purchaseRate) || isNaN(sellingPrice)) { errors.push(`Line ${i + 1}: Stock/Rate/Price must be numbers`); return; }
-        rows.push({ name, grade: grade || '', stock, purchaseRate, sellingPrice, unit, category, lotInfo: { lotName: lotName || '' }, lowStockAlert: unit === 'ml' ? 10 : 2 });
+        rows.push({ name, grade: grade || '', stock, purchaseRate, sellingPrice, unit: 'ml', category: 'Attar', lotInfo: { lotName: lotName || '' }, lowStockAlert: 10 });
       });
       return { rows, errors };
     }
@@ -4142,7 +3834,7 @@
           } else if (importTab === 'sales') {
             // For historical sales, we post directly with a special flag (no stock deduction)
             // We find the product by name first
-            const matchedProduct = allProducts.find(p => p.name.toLowerCase() === row.productName.toLowerCase());
+            const matchedProduct = allProducts.find(p => p.name.toLowerCase() === String(row.productName).toLowerCase());
             const body = {
               customerName: row.customerName,
               items: [{
